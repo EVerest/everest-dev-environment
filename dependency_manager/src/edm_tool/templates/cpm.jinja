@@ -1,0 +1,24 @@
+set(CPM_USE_NAMED_CACHE_DIRECTORIES ON)
+{% for dep in checkout %}
+set(CPM_{{ dep["name"] }}_SOURCE "{{ dep["path"] }}")
+{% endfor %}
+{% for name, value in dependencies.items() %}
+CPMAddPackage(
+    NAME {{ name }}
+    GIT_REPOSITORY {{ value["git"] }}
+{% if "git_tag" in value %}
+    GIT_TAG {{ value["git_tag"] }}
+{% endif %}
+{% if "options" in value and value["options"]|length > 0 %}
+    OPTIONS
+        {{value["options"]|quote|join(" ")}}
+{% endif %}
+)
+{% if "alias" in value %}
+if({{name}}_ADDED)
+  add_library({{value["alias"]["name"]}} ALIAS {{value["alias"]["target"]}})
+endif()
+{% endif %}
+{% endfor %}
+
+

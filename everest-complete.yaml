@@ -1,0 +1,42 @@
+RISE-V2G:
+  git: git@github.com:EVerest/ext-RISE-V2G.git
+  git_tag: master
+  options:
+  - THIRD_PARTY_APP_DST rise_v2g
+everest-core:
+  git: git@github.com:EVerest/everest-core.git
+  git_tag: main
+everest-deploy-devkit:
+  git: git@github.com:EVerest/everest-deploy-devkit.git
+  git_tag: main
+everest-dev-environment:
+  git: git@github.com:EVerest/everest-dev-environment.git
+  git_tag: main
+everest-framework:
+  git: git@github.com:EVerest/everest-framework.git
+  git_tag: main
+everest-utils:
+  git: git@github.com:EVerest/everest-utils.git
+  git_tag: main
+liblog:
+  git: git@github.com:EVerest/liblog.git
+  git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
+libmodbus:
+  git: git@github.com:EVerest/libmodbus.git
+  git_tag: main
+libocpp:
+  git: git@github.com:EVerest/libocpp.git
+  git_tag: main
+libsunspec:
+  git: git@github.com:EVerest/libsunspec.git
+  git_tag: main
+libtimer:
+  git: git@github.com:EVerest/libtimer.git
+  git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
+open-plc-utils:
+  git: git@github.com:EVerest/ext-open-plc-utils.git
+  git_tag: master
