@@ -1,4 +1,8 @@
 #!/bin/bash
+##
+## SPDX-License-Identifier: Apache-2.0
+## Copyright 2020 - 2021 Pionix GmbH and Contributors to EVerest
+##
 echo "generating bash-completion file"
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")/src"
 echo "Using module found in ${SRC_DIR}"
