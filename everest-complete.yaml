@@ -18,6 +18,9 @@ everest-framework:
 everest-utils:
   git: git@github.com:EVerest/everest-utils.git
   git_tag: main
+libfsm:
+  git: git@github.com:EVerest/libfsm.git
+  git_tag: main
 liblog:
   git: git@github.com:EVerest/liblog.git
   git_tag: main
