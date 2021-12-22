@@ -441,7 +441,7 @@ def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict, upda
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
-    parser.add_argument('--version', action='version', version='%(prog)s 0.1.2')
+    parser.add_argument('--version', action='version', version='%(prog)s 0.1.3')
     parser.add_argument(
         "--workspace", metavar='WORKSPACE',
         help="Directory in which source code repositories that are explicity requested are checked out.",
