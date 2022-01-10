@@ -25,6 +25,8 @@ python3 -m pip install --upgrade pip setuptools wheel
 ### Installing edm
 Now you can clone *this repository* and install **edm**:
 
+(make sure you have set up your [ssh key](https://www.atlassian.com/git/tutorials/git-ssh) in github first!)
+
 ```bash
 git clone git@github.com:EVerest/everest-dev-environment.git
 cd everest-dev-environment/dependency_manager
@@ -60,6 +62,7 @@ export CPM_SOURCE_CACHE=$HOME/.cache/CPM
 ```
 
 ### Building everest
+Make sure you have installed [*ev_cli*](https://github.com/EVerest/everest-utils/tree/main/ev-dev-tools) first.
 You can now use the following commands to build everest-core:
 ```bash
 cd ~/checkout/everest-workspace/everest-core
