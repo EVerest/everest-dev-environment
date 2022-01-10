@@ -6,9 +6,6 @@ RISE-V2G:
 everest-core:
   git: git@github.com:EVerest/everest-core.git
   git_tag: main
-everest-deploy-devkit:
-  git: git@github.com:EVerest/everest-deploy-devkit.git
-  git_tag: main
 everest-dev-environment:
   git: git@github.com:EVerest/everest-dev-environment.git
   git_tag: main
