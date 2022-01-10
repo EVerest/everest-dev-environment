@@ -620,7 +620,7 @@ def main(parser: argparse.ArgumentParser):
 
     if args.config:
         if not args.workspace:
-            log.error("A workspace path must be provided if supplying a config. Aborting.")
+            log.error("A workspace path must be provided if supplying a config. Stopping.")
             sys.exit(1)
 
         workspace_dir = Path(args.workspace).expanduser().resolve()
@@ -629,13 +629,13 @@ def main(parser: argparse.ArgumentParser):
         if config_path.exists():
             log.info(f"Using config \"{config_path}\"")
         else:
-            log.error(f"Config file \"{config_path}\" does not exists, aborting.")
+            log.error(f"Config file \"{config_path}\" does not exists, stopping.")
             sys.exit(1)
         config = parse_config(config_path)
         try:
             workspace_checkout = setup_workspace(workspace_dir, config, args.update)
         except LocalDependencyCheckoutError as e:
-            log.error("Could not setup workspace. Aborting.")
+            log.error("Could not setup workspace. Stopping.")
             sys.exit(1)
         # copy config into workspace
         try:
@@ -783,7 +783,7 @@ def main(parser: argparse.ArgumentParser):
             workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
             log.info(f"Using workspace directory \"{workspace_dir}\" from workspace.yaml.")
         else:
-            print(f"Cannot checkout requested dependencies without a workspace directory, aborting.")
+            print(f"Cannot checkout requested dependencies without a workspace directory, stopping.")
             sys.exit(1)
         for name, entry in workspace["local_dependencies"].items():
             if name not in dependencies:
