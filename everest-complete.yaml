@@ -26,12 +26,16 @@ liblog:
 libmodbus:
   git: git@github.com:EVerest/libmodbus.git
   git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
 libocpp:
   git: git@github.com:EVerest/libocpp.git
   git_tag: main
 libsunspec:
   git: git@github.com:EVerest/libsunspec.git
   git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
 libtimer:
   git: git@github.com:EVerest/libtimer.git
   git_tag: main
