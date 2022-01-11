@@ -25,7 +25,7 @@ setup(
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Build Tools',
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: Apache Software License',
     ],
     package_dir={'': 'src'},
     packages=find_packages(where='src'),
