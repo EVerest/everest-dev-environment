@@ -61,17 +61,6 @@ This means you *can* and **should** set the *CPM_SOURCE_CACHE* environment varia
 export CPM_SOURCE_CACHE=$HOME/.cache/CPM
 ```
 
-### Building everest
-Make sure you have installed [*ev_cli*](https://github.com/EVerest/everest-utils/tree/main/ev-dev-tools) first.
-You can now use the following commands to build everest-core:
-```bash
-cd ~/checkout/everest-workspace/everest-core
-mkdir build
-cd build
-cmake ..
-make install
-```
-
 ### Python packages needed to run edm
 The following Python3 packages are needed to run the **edm** dependency manager.
 If you installed **edm** using the guide above they were already installed automatically.
