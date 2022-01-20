@@ -351,7 +351,7 @@ class GitInfo:
     @classmethod
     def pull_all(cls, path: Path, repos=None) -> dict:
         """Pull all repositories in the given path, or a specific list of repos."""
-        git_info = dict()
+        git_info = {}
         subdirs = list(path.glob("*/"))
         for subdir in subdirs:
             subdir_path = Path(subdir)
