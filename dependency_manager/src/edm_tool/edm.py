@@ -76,7 +76,8 @@ class Color:
     MAGENTA = "\033[35m"
     CYAN = "\033[36m"
 
-    def set_none():
+    @classmethod
+    def set_none(cls):
         """Remove the color codes for no-color mode."""
         Color.DEFAULT = ""
         Color.CLEAR = ""
@@ -170,7 +171,8 @@ def pattern_matches(string: str, patterns: list) -> bool:
 class GitInfo:
     """Provide information about git repositories."""
 
-    def is_repo(path: Path) -> bool:
+    @classmethod
+    def is_repo(cls, path: Path) -> bool:
         """Return true if path is a top-level git repo."""
         result = subprocess.run(["git", "-C", path, "rev-parse", "--git-dir"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -180,7 +182,8 @@ class GitInfo:
                 return True
         return False
 
-    def is_dirty(path: Path) -> bool:
+    @classmethod
+    def is_dirty(cls, path: Path) -> bool:
         """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
         result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -192,7 +195,8 @@ class GitInfo:
 
         return True
 
-    def is_detached(path: Path) -> bool:
+    @classmethod
+    def is_detached(cls, path: Path) -> bool:
         """Check if the git repo at path is in detached HEAD state."""
         result = subprocess.run(["git", "-C", path, "symbolic-ref", "-q", "HEAD"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -201,7 +205,8 @@ class GitInfo:
 
         return True
 
-    def fetch(path: Path) -> bool:
+    @classmethod
+    def fetch(cls, path: Path) -> bool:
         """
         Return true if git-fetch was successful, false if not.
 
@@ -216,7 +221,8 @@ class GitInfo:
         log.error(f"\"{path.name}\" Error during git-fetch: {result.returncode}")
         return False
 
-    def pull(path: Path) -> bool:
+    @classmethod
+    def pull(cls, path: Path) -> bool:
         """
         Return true if git-pull was successful, false if not.
 
@@ -232,7 +238,8 @@ class GitInfo:
         log.error(f"\"{path.name}\" Error during git-pull: {result.returncode}\n{pretty_stderr}")
         return False
 
-    def get_behind(path: Path) -> str:
+    @classmethod
+    def get_behind(cls, path: Path) -> str:
         """Return how many commits behind the repo at path is relative to remote."""
         result = subprocess.run(["git", "-C", path, "rev-list", "--count", "HEAD..@{u}"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -241,7 +248,8 @@ class GitInfo:
             behind = result.stdout.decode("utf-8").replace("\n", "")
         return behind
 
-    def get_ahead(path: Path) -> str:
+    @classmethod
+    def get_ahead(cls, path: Path) -> str:
         """Return how many commits ahead the repo at path is relative to remote."""
         result = subprocess.run(["git", "-C", path, "rev-list", "--count", "@{u}..HEAD"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -250,7 +258,8 @@ class GitInfo:
             ahead = result.stdout.decode("utf-8").replace("\n", "")
         return ahead
 
-    def get_tag(path: Path) -> str:
+    @classmethod
+    def get_tag(cls, path: Path) -> str:
         """Return the current tag of the repo at path, or an empty str."""
         result = subprocess.run(["git", "-C", path, "describe", "--exact-match", "--tags"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -259,7 +268,8 @@ class GitInfo:
             tag = result.stdout.decode("utf-8").replace("\n", "")
         return tag
 
-    def get_branch(path: Path) -> str:
+    @classmethod
+    def get_branch(cls, path: Path) -> str:
         """Return the current branch of the repo at path, or an empty str."""
         result = subprocess.run(["git", "-C", path, "symbolic-ref", "--short", "-q", "HEAD"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -268,7 +278,8 @@ class GitInfo:
             branch = result.stdout.decode("utf-8").replace("\n", "")
         return branch
 
-    def get_remote_branch(path: Path) -> str:
+    @classmethod
+    def get_remote_branch(cls, path: Path) -> str:
         """Return. the remote of the current branch of the repo at path, or an empty str."""
         result = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -277,7 +288,8 @@ class GitInfo:
             remote_branch = result.stdout.decode("utf-8").replace("\n", "")
         return remote_branch
 
-    def get_git_info(path: Path, fetch=False) -> dict:
+    @classmethod
+    def get_git_info(cls, path: Path, fetch=False) -> dict:
         """
         Return useful information about a repository a the given path.
 
@@ -304,7 +316,8 @@ class GitInfo:
             git_info[subdir] = repo_info
         return git_info
 
-    def pull_all(path: Path, repos=[]) -> dict:
+    @classmethod
+    def pull_all(cls, path: Path, repos=[]) -> dict:
         """Pull all repositories in the given path, or a specific list of repos."""
         git_info = dict()
         subdirs = list(path.glob("*/"))
