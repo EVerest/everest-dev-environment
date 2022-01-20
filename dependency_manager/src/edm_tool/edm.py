@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 #
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 - 2021 Pionix GmbH and Contributors to EVerest
+# Copyright 2020 - 2022 Pionix GmbH and Contributors to EVerest
 #
+"""Everest Dependency Manager."""
 import argparse
 from enum import Enum, auto
 import logging
@@ -20,11 +21,13 @@ log = logging.getLogger("edm")
 
 
 class LocalDependencyCheckoutError(Exception):
+    """Exception thrown when a dependency could not be checked out."""
+
     pass
 
 
 def install_cmake():
-    """Installs required CMake modules into the users cmake packages path"""
+    """Install required CMake modules into the users cmake packages path."""
     cmake_package_registry_path = Path.home() / ".cmake" / "packages" / "EDM"
     cmake_package_registry_path.mkdir(parents=True, exist_ok=True)
     edm_package_registry_file_path = cmake_package_registry_path / "edm"
@@ -36,6 +39,7 @@ def install_cmake():
 
 
 def install_bash_completion(path=Path("~/.local/share/bash-completion")):
+    """Install bash completion to a user provided path."""
     source_bash_completion_file_path = Path(__file__).parent / "edm-completion.bash"
     target_bash_completion_dir = Path("~/.local/share/bash-completion").expanduser()
     target_bash_completion_dir_file_path = target_bash_completion_dir / "edm.sh"
@@ -47,18 +51,20 @@ def install_bash_completion(path=Path("~/.local/share/bash-completion")):
 
     if not bash_completion_in_home.exists():
         with open(bash_completion_in_home, 'w') as bash_completion_dotfile:
-            bash_completion_dotfile.write(f"for bash_completion_file in ~/.local/share/bash-completion/* ; do\n"
-                                          f"    [ -f \"$bash_completion_file\" ] && . $bash_completion_file\n"
-                                          f"done")
+            bash_completion_dotfile.write("for bash_completion_file in ~/.local/share/bash-completion/* ; do\n"
+                                          "    [ -f \"$bash_completion_file\" ] && . $bash_completion_file\n"
+                                          "done")
             log.info(f"Updated \"{bash_completion_in_home}\" to point to edm bash completion "
                      f"in \"{target_bash_completion_dir}\"")
     else:
         log.warning(f"\"{bash_completion_in_home}\" exists, could not automatically install bash-completion")
-        log.info(f"Please add the following entry to your .bashrc:")
+        log.info("Please add the following entry to your .bashrc:")
         log.info(f". {target_bash_completion_dir}/edm.sh")
 
 
 class Color:
+    """Represents a subset of terminal color codes for use in log messages."""
+
     DEFAULT = ""
     CLEAR = "\033[0m"
     BLACK = "\033[30m"
@@ -72,6 +78,7 @@ class Color:
     CYAN = "\033[36m"
 
     def set_none():
+        """Remove the color codes for no-color mode."""
         Color.DEFAULT = ""
         Color.CLEAR = ""
         Color.BLACK = ""
@@ -86,9 +93,10 @@ class Color:
 
 
 class ColorFormatter(logging.Formatter):
-    """Logging formatter that uses pre-configured colors for different logging levels"""
+    """Logging formatter that uses pre-configured colors for different logging levels."""
 
     def __init__(self, color=True, formatting_str="[%(name)s]: %(message)s"):
+        """Initialize the ColorFormatter."""
         super().__init__()
         self.color = color
         if not color:
@@ -103,22 +111,24 @@ class ColorFormatter(logging.Formatter):
         }
 
     def build_colored_formatting_string(self, color: Color) -> str:
+        """Build a formatting string with the provided color."""
         if self.color:
             return f"{color}{self.formatting_str}{Color.CLEAR}"
         else:
             return f"{self.formatting_str}"
 
     def format(self, record):
+        """Format a record with the colored formatter."""
         return logging.Formatter(self.colored_formatting_strings[record.levelno]).format(record)
 
 
 def quote(lst: list) -> list:
-    """Put quotation marks around every list element, which is assumed to be a str"""
+    """Put quotation marks around every list element, which is assumed to be a str."""
     return [f"\"{element}\"" for element in lst]
 
 
 def prettify(lst: list, indent: int) -> str:
-    """Construct string from list elements with the given indentation"""
+    """Construct string from list elements with the given indentation."""
     output = ""
     space = " " * indent
     for out in lst:
@@ -131,7 +141,7 @@ def prettify(lst: list, indent: int) -> str:
 
 
 def pretty_print(lst: list, indent: int):
-    """Debug log every list element with the given indentation"""
+    """Debug log every list element with the given indentation."""
     space = " " * indent
     for out in lst:
         if out and out != "\n":
@@ -139,7 +149,7 @@ def pretty_print(lst: list, indent: int):
 
 
 def pretty_print_process(c: subprocess.CompletedProcess, indent: int):
-    """Pretty print stdout and stderr of a CompletedProcess object"""
+    """Pretty print stdout and stderr of a CompletedProcess object."""
     stdout = c.stdout.decode("utf-8").split("\n")
     pretty_print(stdout, indent)
 
@@ -148,7 +158,7 @@ def pretty_print_process(c: subprocess.CompletedProcess, indent: int):
 
 
 def pattern_matches(string: str, patterns: list) -> bool:
-    """Returns true if one of the patterns match with the string, false otherwise"""
+    """Return true if one of the patterns match with the string, false otherwise."""
     matches = False
     for pattern in patterns:
         if PurePath(string).match(pattern):
@@ -159,8 +169,10 @@ def pattern_matches(string: str, patterns: list) -> bool:
 
 
 class GitInfo:
+    """Provide information about git repositories."""
+
     def is_repo(path: Path) -> bool:
-        """Returns true if path is a top-level git repo"""
+        """Return true if path is a top-level git repo."""
         result = subprocess.run(["git", "-C", path, "rev-parse", "--git-dir"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode == 0:
@@ -170,7 +182,7 @@ class GitInfo:
         return False
 
     def is_dirty(path: Path) -> bool:
-        """Uses git diff to check if the provided directory has uncommitted changes, ignoring untracked files"""
+        """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
         result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode == 0:
@@ -182,7 +194,7 @@ class GitInfo:
         return True
 
     def is_detached(path: Path) -> bool:
-        """Checks if the git repo at path is in detached HEAD state"""
+        """Check if the git repo at path is in detached HEAD state."""
         result = subprocess.run(["git", "-C", path, "symbolic-ref", "-q", "HEAD"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode == 0:
@@ -191,7 +203,8 @@ class GitInfo:
         return True
 
     def fetch(path: Path) -> bool:
-        """Returns true if git-fetch was successful, false if not
+        """Return true if git-fetch was successful, false if not.
+
         TODO: distinguish between error codes?
         """
         log.debug(f"\"{path.name}\": fetching information from remote. This might take a few seconds.")
@@ -204,7 +217,8 @@ class GitInfo:
         return False
 
     def pull(path: Path) -> bool:
-        """Returns true if git-pull was successful, false if not
+        """Return true if git-pull was successful, false if not.
+
         TODO: distinguish between error codes?
         """
         log.info(f"\"{path.name}\": pulling from remote. This might take a few seconds.")
@@ -218,7 +232,7 @@ class GitInfo:
         return False
 
     def get_behind(path: Path) -> str:
-        """Returns how many commits behind the repo at path is relative to remote"""
+        """Return how many commits behind the repo at path is relative to remote."""
         result = subprocess.run(["git", "-C", path, "rev-list", "--count", "HEAD..@{u}"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         behind = ""
@@ -227,7 +241,7 @@ class GitInfo:
         return behind
 
     def get_ahead(path: Path) -> str:
-        """Returns how many commits ahead the repo at path is relative to remote"""
+        """Return how many commits ahead the repo at path is relative to remote."""
         result = subprocess.run(["git", "-C", path, "rev-list", "--count", "@{u}..HEAD"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         ahead = ""
@@ -236,7 +250,7 @@ class GitInfo:
         return ahead
 
     def get_tag(path: Path) -> str:
-        """Returns the current tag of the repo at path, or an empty str"""
+        """Return the current tag of the repo at path, or an empty str."""
         result = subprocess.run(["git", "-C", path, "describe", "--exact-match", "--tags"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         tag = ""
@@ -245,7 +259,7 @@ class GitInfo:
         return tag
 
     def get_branch(path: Path) -> str:
-        """Returns the current branch of the repo at path, or an empty str"""
+        """Return the current branch of the repo at path, or an empty str."""
         result = subprocess.run(["git", "-C", path, "symbolic-ref", "--short", "-q", "HEAD"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         branch = ""
@@ -254,7 +268,7 @@ class GitInfo:
         return branch
 
     def get_remote_branch(path: Path) -> str:
-        """Returns the remoe of the current branch of the repo at path, or an empty str"""
+        """Return. the remote of the current branch of the repo at path, or an empty str."""
         result = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         remote_branch = ""
@@ -263,7 +277,8 @@ class GitInfo:
         return remote_branch
 
     def get_git_info(path: Path, fetch=False) -> dict:
-        """Returns useful information about a repository a the given path
+        """Return useful information about a repository a the given path.
+
         TODO: return type should be a well defined object
         Returns an empty dictionary if the path is no git repo
         """
@@ -288,7 +303,7 @@ class GitInfo:
         return git_info
 
     def pull_all(path: Path, repos=[]) -> dict:
-        """Pulls all repositories in the given path, or a specific list of repos"""
+        """Pull all repositories in the given path, or a specific list of repos."""
         git_info = dict()
         subdirs = list(path.glob("*/"))
         for subdir in subdirs:
@@ -306,7 +321,7 @@ class GitInfo:
 
 
 def is_git_dirty(path: Path) -> bool:
-    """Uses git diff to check if the provided directory has uncommitted changes, ignoring untracked files"""
+    """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
     log.debug(f"  Checking if directory \"{path}\" is dirty")
     result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -320,7 +335,12 @@ def is_git_dirty(path: Path) -> bool:
 
 
 def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path) -> dict:
+    """Clone local dependency into checkout_dir.
+
+    If the directory already exists only switch branches if the git repo is not dirty.
+    """
     def clone_dependency_repo(git: str, git_tag: str, checkout_dir: Path) -> None:
+        """Clone given git repository at the given git_tag into checkout_dir."""
         git_clone_args = [git, checkout_dir]
         if git_tag:
             git_clone_args = ["--branch", git_tag, git, checkout_dir]
@@ -336,9 +356,6 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
             log.error(error_message)
             raise LocalDependencyCheckoutError(error_message)
 
-    """clone local dependency into checkout_dir
-    if the directory already exists only switch branches if the git repo is not dirty
-    """
     log.info(f"Setting up dependency \"{Color.GREEN}{name}{Color.CLEAR}\" in workspace")
     log.debug(f"  git-remote: \"{git}\"")
     log.debug(f"  git-tag: \"{git_tag}\"")
@@ -362,7 +379,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
 
 
 def parse_config(path: Path) -> dict:
-    """Parses a config file in yaml format at the given path"""
+    """Parse a config file in yaml format at the given path."""
     if path.is_file():
         with open(path) as config_file:
             try:
@@ -375,7 +392,7 @@ def parse_config(path: Path) -> dict:
 
 
 def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
-    """Setup a workspace at the given workspace_path using the given config"""
+    """Setup a workspace at the given workspace_path using the given config."""
     log.info(f"Setting up workspace \"{workspace_path}\"")
     workspace_checkout = []
     for name, entry in config.items():
@@ -415,7 +432,7 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
 
 
 def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict, update=True):
-    """Create a VS Code compatible workspace file at the given workspace_path"""
+    """Create a VS Code compatible workspace file at the given workspace_path."""
     vscode_workspace_file_path = workspace_path / f"{workspace_path.name}.code-workspace"
 
     content = dict()
@@ -439,9 +456,10 @@ def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict, upda
 
 
 def get_parser() -> argparse.ArgumentParser:
+    """Return the argument parser containign all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
-    parser.add_argument('--version', action='version', version='%(prog)s 0.1.3')
+    parser.add_argument('--version', action='version', version='%(prog)s 0.1.4')
     parser.add_argument(
         "--workspace", metavar='WORKSPACE',
         help="Directory in which source code repositories that are explicity requested are checked out.",
@@ -512,6 +530,7 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def main(parser: argparse.ArgumentParser):
+    """The main entrypoint of edm. Provides different functionality based on the given command line arguments."""
     args = parser.parse_args()
     if args.verbose:
         log.setLevel(level=logging.DEBUG)
