@@ -5,7 +5,6 @@
 #
 """Everest Dependency Manager."""
 import argparse
-from enum import Enum, auto
 import logging
 import json
 from jinja2 import Environment, FileSystemLoader
@@ -21,7 +20,6 @@ log = logging.getLogger("edm")
 
 
 class LocalDependencyCheckoutError(Exception):
-
     """Exception thrown when a dependency could not be checked out."""
 
     pass
@@ -204,7 +202,8 @@ class GitInfo:
         return True
 
     def fetch(path: Path) -> bool:
-        """Return true if git-fetch was successful, false if not.
+        """
+        Return true if git-fetch was successful, false if not.
 
         TODO: distinguish between error codes?
         """
@@ -218,7 +217,8 @@ class GitInfo:
         return False
 
     def pull(path: Path) -> bool:
-        """Return true if git-pull was successful, false if not.
+        """
+        Return true if git-pull was successful, false if not.
 
         TODO: distinguish between error codes?
         """
@@ -278,7 +278,8 @@ class GitInfo:
         return remote_branch
 
     def get_git_info(path: Path, fetch=False) -> dict:
-        """Return useful information about a repository a the given path.
+        """
+        Return useful information about a repository a the given path.
 
         TODO: return type should be a well defined object
         Returns an empty dictionary if the path is no git repo
@@ -336,7 +337,8 @@ def is_git_dirty(path: Path) -> bool:
 
 
 def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path) -> dict:
-    """Clone local dependency into checkout_dir.
+    """
+    Clone local dependency into checkout_dir.
 
     If the directory already exists only switch branches if the git repo is not dirty.
     """
@@ -346,7 +348,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
         if git_tag:
             git_clone_args = ["--branch", git_tag, git, checkout_dir]
         else:
-            log.debug(f"  No git-tag specified, cloning default branch.")
+            log.debug("  No git-tag specified, cloning default branch.")
         git_clone_cmd = ["git", "clone"] + git_clone_args
 
         try:
@@ -365,7 +367,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
         log.debug(f"    ... the directory for dependency \"{name}\" already exists at \"{checkout_dir}\".")
         # check if git is dirty
         if is_git_dirty(checkout_dir):
-            log.debug(f"    Repo is dirty, nothing will be done to this repo.")
+            log.debug("    Repo is dirty, nothing will be done to this repo.")
         else:
             # if the repo is clean we can safely switch branches
             if git_tag is not None:
@@ -708,7 +710,7 @@ def main(parser: argparse.ArgumentParser):
 
     if args.create_config:
         new_config_path = Path(args.create_config).expanduser().resolve()
-        log.info(f"Creating config")
+        log.info("Creating config")
         new_config = dict()
         if args.external_in_config:
             new_config = {**new_config, **dependencies}
@@ -803,7 +805,7 @@ def main(parser: argparse.ArgumentParser):
             workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
             log.info(f"Using workspace directory \"{workspace_dir}\" from workspace.yaml.")
         else:
-            print(f"Cannot checkout requested dependencies without a workspace directory, stopping.")
+            print("Cannot checkout requested dependencies without a workspace directory, stopping.")
             sys.exit(1)
         for name, entry in workspace["local_dependencies"].items():
             if name not in dependencies:
