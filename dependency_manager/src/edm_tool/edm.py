@@ -33,7 +33,7 @@ def install_cmake():
     cmake_files_path = Path(__file__).parent / "cmake"
     log.debug(f"Storing EDM CMake path \"{cmake_files_path}\" "
               f"in CMake package registry \"{edm_package_registry_file_path}\".")
-    with open(edm_package_registry_file_path, 'w') as edm_package_registry_file:
+    with open(edm_package_registry_file_path, 'w', encoding='utf-8') as edm_package_registry_file:
         edm_package_registry_file.write(f"{cmake_files_path}")
 
 
@@ -49,7 +49,7 @@ def install_bash_completion(path=Path("~/.local/share/bash-completion")):
     log.debug("Updated edm bash completion file")
 
     if not bash_completion_in_home.exists():
-        with open(bash_completion_in_home, 'w') as bash_completion_dotfile:
+        with open(bash_completion_in_home, 'w', encoding='utf-8') as bash_completion_dotfile:
             bash_completion_dotfile.write("for bash_completion_file in ~/.local/share/bash-completion/* ; do\n"
                                           "    [ -f \"$bash_completion_file\" ] && . $bash_completion_file\n"
                                           "done")
@@ -397,7 +397,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
 def parse_config(path: Path) -> dict:
     """Parse a config file in yaml format at the given path."""
     if path.is_file():
-        with open(path) as config_file:
+        with open(path, encoding='utf-8') as config_file:
             try:
                 config_yaml = yaml.safe_load(config_file)
                 if config_yaml is not None:
@@ -441,7 +441,7 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
                 log.warning("    Use --update to overwrite workspace.yaml")
                 continue
         log.debug(f"    Writing \"{workspace_yaml_file}\"")
-        with open(workspace_yaml_file, 'w') as w:
+        with open(workspace_yaml_file, 'w', encoding='utf-8') as w:
             yaml.dump(workspace_config, w)
     log.info("Done.")
     return workspace_checkout
@@ -456,7 +456,7 @@ def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict, upda
         log.warning(
             f"VS Code workspace file \"{vscode_workspace_file_path}\" exists.")
         log.info("Updating VS Code workspace file.")
-        with open(vscode_workspace_file_path, 'r') as ws_file:
+        with open(vscode_workspace_file_path, 'r', encoding='utf-8') as ws_file:
             content = json.load(ws_file)
     else:
         log.info(f"Creating VS Code workspace file at: {vscode_workspace_file_path}")
@@ -467,7 +467,7 @@ def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict, upda
         if not any(f["path"] == folder for f in content["folders"]):
             log.debug(f"Dependency \"{Color.GREEN}{folder}{Color.GREY}\" added to VS Code workspace file")
             content["folders"].append({"path": folder})
-    with open(vscode_workspace_file_path, 'w') as ws_file:
+    with open(vscode_workspace_file_path, 'w', encoding='utf-8') as ws_file:
         json.dump(content, ws_file, indent="\t")
 
 
@@ -713,7 +713,7 @@ def main(parser: argparse.ArgumentParser):
                         f"because this file is located in a \"_deps\" subdirectory.")
                     continue
             log.info(f"Parsing dependencies file: {dependencies_file}")
-            with open(dependencies_file) as dep:
+            with open(dependencies_file, encoding='utf-8') as dep:
                 try:
                     dependencies_yaml = yaml.safe_load(dep)
                     if dependencies_yaml is not None:
@@ -784,7 +784,7 @@ def main(parser: argparse.ArgumentParser):
 
         for config_entry_name, config_entry in new_config.items():
             log.info(f"Adding \"{Color.GREEN}{config_entry_name}{Color.CLEAR}\" to config.")
-        with open(new_config_path, 'w') as new_config_file:
+        with open(new_config_path, 'w', encoding='utf-8') as new_config_file:
             yaml.dump(new_config, new_config_file)
             log.info(f"Successfully saved config \"{new_config_path}\".")
         sys.exit(0)
@@ -799,7 +799,7 @@ def main(parser: argparse.ArgumentParser):
         workspace_file = Path(workspace_files[0]).expanduser().resolve()
         if workspace_file.is_file():
             log.info(f"Using workspace file: {workspace_file}")
-            with open(workspace_file) as wsp:
+            with open(workspace_file, encoding='utf-8') as wsp:
                 try:
                     workspace_yaml = yaml.safe_load(wsp)
                     if workspace_yaml is not None:
@@ -845,7 +845,7 @@ def main(parser: argparse.ArgumentParser):
         "checkout": checkout,
         "workspace": workspace})
 
-    with open(out_file, 'w') as out:
+    with open(out_file, 'w', encoding='utf-8') as out:
         log.info(f"Saving dependencies in: {out_file}")
         out.write(render)
 
