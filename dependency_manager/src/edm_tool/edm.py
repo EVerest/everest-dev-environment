@@ -328,7 +328,7 @@ class GitInfo:
         TODO: return type should be a well defined object
         Returns an empty dictionary if the path is no git repo
         """
-        git_info = dict()
+        git_info = {}
         subdirs = list(path.glob("*/"))
         for subdir in subdirs:
             subdir_path = Path(subdir)
@@ -442,7 +442,7 @@ def parse_config(path: Path) -> dict:
                     return config_yaml
             except yaml.YAMLError as e:
                 print(f"Error parsing yaml of {config_file}: {e}")
-    return dict()
+    return {}
 
 
 def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
@@ -464,11 +464,11 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
         name = entry["name"]
         workspace_yaml_file = entry["path"] / "workspace.yaml"
         log.info(f"  {Color.GREEN}{name}{Color.CLEAR}")
-        workspace_config = dict()
+        workspace_config = {}
         workspace_config["workspace"] = workspace_path.as_posix()
-        workspace_config["local_dependencies"] = dict()
+        workspace_config["local_dependencies"] = {}
         for workspace_entry in workspace_checkout:
-            workspace_config_entry = dict()
+            workspace_config_entry = {}
             workspace_config_entry["git_tag"] = workspace_entry["git_tag"]
             workspace_config["local_dependencies"][workspace_entry["name"]] = workspace_config_entry
         if workspace_yaml_file.exists():
@@ -489,7 +489,7 @@ def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict):
     """Create a VS Code compatible workspace file at the given workspace_path."""
     vscode_workspace_file_path = workspace_path / f"{workspace_path.name}.code-workspace"
 
-    content = dict()
+    content = {}
     if vscode_workspace_file_path.exists():
         log.warning(
             f"VS Code workspace file \"{vscode_workspace_file_path}\" exists.")
@@ -739,7 +739,7 @@ def main(parser: argparse.ArgumentParser):
             f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
         sys.exit(1)
 
-    dependencies = dict()
+    dependencies = {}
     for dependencies_file in dependencies_files:
         if dependencies_file.is_file():
             # filter _deps folders
@@ -762,7 +762,7 @@ def main(parser: argparse.ArgumentParser):
     if args.create_config:
         new_config_path = Path(args.create_config).expanduser().resolve()
         log.info("Creating config")
-        new_config = dict()
+        new_config = {}
         if args.external_in_config:
             new_config = {**new_config, **dependencies}
             log.debug("Including external dependencies in generated config.")
@@ -788,7 +788,7 @@ def main(parser: argparse.ArgumentParser):
                 continue
             log.debug(f"Checking {subdir_path}: {subdir_path.name}")
 
-            entry = dict()
+            entry = {}
 
             try:
                 remote_result = subprocess.run(["git", "-C", subdir_path, "config", "--get", "remote.origin.url"],
@@ -835,7 +835,7 @@ def main(parser: argparse.ArgumentParser):
                   "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
         sys.exit(1)
 
-    workspace = dict()
+    workspace = {}
     if len(workspace_files) == 1:
         workspace_file = Path(workspace_files[0]).expanduser().resolve()
         if workspace_file.is_file():
