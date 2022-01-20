@@ -22,8 +22,6 @@ log = logging.getLogger("edm")
 class LocalDependencyCheckoutError(Exception):
     """Exception thrown when a dependency could not be checked out."""
 
-    pass
-
 
 def install_cmake():
     """Install required CMake modules into the users cmake packages path."""
@@ -40,7 +38,7 @@ def install_cmake():
 def install_bash_completion(path=Path("~/.local/share/bash-completion")):
     """Install bash completion to a user provided path."""
     source_bash_completion_file_path = Path(__file__).parent / "edm-completion.bash"
-    target_bash_completion_dir = Path("~/.local/share/bash-completion").expanduser()
+    target_bash_completion_dir = path.expanduser()
     target_bash_completion_dir_file_path = target_bash_completion_dir / "edm.sh"
     bash_completion_in_home = Path("~/.bash_completion").expanduser()
     if not target_bash_completion_dir.exists():
@@ -114,8 +112,7 @@ class ColorFormatter(logging.Formatter):
         """Build a formatting string with the provided color."""
         if self.color:
             return f"{color}{self.formatting_str}{Color.CLEAR}"
-        else:
-            return f"{self.formatting_str}"
+        return f"{self.formatting_str}"
 
     def format(self, record):
         """Format a record with the colored formatter."""
@@ -370,7 +367,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
         except subprocess.CalledProcessError as e:
             error_message = f"   Error while cloning git repository during local dependency checkout: {str(e.stderr.decode())}"
             log.error(error_message)
-            raise LocalDependencyCheckoutError(error_message)
+            raise LocalDependencyCheckoutError(error_message) from e
 
     log.info(f"Setting up dependency \"{Color.GREEN}{name}{Color.CLEAR}\" in workspace")
     log.debug(f"  git-remote: \"{git}\"")
@@ -447,7 +444,7 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
     return workspace_checkout
 
 
-def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict, update=True):
+def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict):
     """Create a VS Code compatible workspace file at the given workspace_path."""
     vscode_workspace_file_path = workspace_path / f"{workspace_path.name}.code-workspace"
 
@@ -669,7 +666,7 @@ def main(parser: argparse.ArgumentParser):
         config = parse_config(config_path)
         try:
             workspace_checkout = setup_workspace(workspace_dir, config, args.update)
-        except LocalDependencyCheckoutError as e:
+        except LocalDependencyCheckoutError:
             log.error("Could not setup workspace. Stopping.")
             sys.exit(1)
         # copy config into workspace
@@ -677,7 +674,7 @@ def main(parser: argparse.ArgumentParser):
             config_destination_path = workspace_dir / "workspace-config.yaml"
             shutil.copyfile(config_path, config_destination_path)
             log.info(f"Copied config into \"{config_destination_path}\"")
-        except shutil.SameFileError as e:
+        except shutil.SameFileError:
             log.info(f"Did not copy workspace config because source and destination are the same \"{config_path}\"")
 
         if args.create_vscode_workspace:
@@ -782,7 +779,7 @@ def main(parser: argparse.ArgumentParser):
                     continue
             new_config[name] = entry
 
-        for config_entry_name, config_entry in new_config.items():
+        for config_entry_name, _ in new_config.items():
             log.info(f"Adding \"{Color.GREEN}{config_entry_name}{Color.CLEAR}\" to config.")
         with open(new_config_path, 'w', encoding='utf-8') as new_config_file:
             yaml.dump(new_config, new_config_file)
