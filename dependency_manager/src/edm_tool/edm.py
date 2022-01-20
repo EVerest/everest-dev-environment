@@ -317,13 +317,13 @@ class GitInfo:
         return git_info
 
     @classmethod
-    def pull_all(cls, path: Path, repos=[]) -> dict:
+    def pull_all(cls, path: Path, repos=None) -> dict:
         """Pull all repositories in the given path, or a specific list of repos."""
         git_info = dict()
         subdirs = list(path.glob("*/"))
         for subdir in subdirs:
             subdir_path = Path(subdir)
-            if len(repos) > 0 and subdir_path.name not in repos:
+            if repos is not None and len(repos) > 0 and subdir_path.name not in repos:
                 log.debug(f"Skipping {subdir_path.name} because it is not in the list of provided repos.")
                 continue
             pull_info = {'is_repo': False}
