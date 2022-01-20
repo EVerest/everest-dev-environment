@@ -21,6 +21,7 @@ log = logging.getLogger("edm")
 
 
 class LocalDependencyCheckoutError(Exception):
+
     """Exception thrown when a dependency could not be checked out."""
 
     pass
