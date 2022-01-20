@@ -171,34 +171,43 @@ class GitInfo:
     @classmethod
     def is_repo(cls, path: Path) -> bool:
         """Return true if path is a top-level git repo."""
-        result = subprocess.run(["git", "-C", path, "rev-parse", "--git-dir"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            repo_dir = result.stdout.decode("utf-8").replace("\n", "")
-            if repo_dir == ".git":
-                return True
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-parse", "--git-dir"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                repo_dir = result.stdout.decode("utf-8").replace("\n", "")
+                if repo_dir == ".git":
+                    return True
+        except subprocess.CalledProcessError:
+            return False
         return False
 
     @classmethod
     def is_dirty(cls, path: Path) -> bool:
         """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
-        result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            result = subprocess.run(["git", "-C", path, "diff", "--cached", "--quiet", "--exit-code"],
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
             if result.returncode == 0:
-                return False
+                result = subprocess.run(["git", "-C", path, "diff", "--cached", "--quiet", "--exit-code"],
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                if result.returncode == 0:
+                    return False
+        except subprocess.CalledProcessError:
+            return True
 
         return True
 
     @classmethod
     def is_detached(cls, path: Path) -> bool:
         """Check if the git repo at path is in detached HEAD state."""
-        result = subprocess.run(["git", "-C", path, "symbolic-ref", "-q", "HEAD"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            return False
+        try:
+            result = subprocess.run(["git", "-C", path, "symbolic-ref", "-q", "HEAD"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                return False
+        except subprocess.CalledProcessError:
+            return True
 
         return True
 
@@ -210,12 +219,15 @@ class GitInfo:
         TODO: distinguish between error codes?
         """
         log.debug(f"\"{path.name}\": fetching information from remote. This might take a few seconds.")
-        result = subprocess.run(["git", "-C", path, "fetch"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            return True
+        try:
+            result = subprocess.run(["git", "-C", path, "fetch"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                return True
+        except subprocess.CalledProcessError as result:
+            log.error(f"\"{path.name}\" Error during git-fetch: {result.returncode}")
+            return False
 
-        log.error(f"\"{path.name}\" Error during git-fetch: {result.returncode}")
         return False
 
     @classmethod
@@ -226,63 +238,86 @@ class GitInfo:
         TODO: distinguish between error codes?
         """
         log.info(f"\"{path.name}\": pulling from remote. This might take a few seconds.")
-        result = subprocess.run(["git", "-C", path, "pull"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            return True
+        try:
+            result = subprocess.run(["git", "-C", path, "pull"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                return True
+        except subprocess.CalledProcessError as result:
+            pretty_stderr = prettify(result.stderr.decode("utf-8").split("\n"), 4)
+            log.error(f"\"{path.name}\" Error during git-pull: {result.returncode}\n{pretty_stderr}")
+            return False
 
-        pretty_stderr = prettify(result.stderr.decode("utf-8").split("\n"), 4)
-        log.error(f"\"{path.name}\" Error during git-pull: {result.returncode}\n{pretty_stderr}")
         return False
 
     @classmethod
     def get_behind(cls, path: Path) -> str:
         """Return how many commits behind the repo at path is relative to remote."""
-        result = subprocess.run(["git", "-C", path, "rev-list", "--count", "HEAD..@{u}"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         behind = ""
-        if result.returncode == 0:
-            behind = result.stdout.decode("utf-8").replace("\n", "")
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-list", "--count", "HEAD..@{u}"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                behind = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return behind
+
         return behind
 
     @classmethod
     def get_ahead(cls, path: Path) -> str:
         """Return how many commits ahead the repo at path is relative to remote."""
-        result = subprocess.run(["git", "-C", path, "rev-list", "--count", "@{u}..HEAD"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         ahead = ""
-        if result.returncode == 0:
-            ahead = result.stdout.decode("utf-8").replace("\n", "")
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-list", "--count", "@{u}..HEAD"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                ahead = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return ahead
+
         return ahead
 
     @classmethod
     def get_tag(cls, path: Path) -> str:
         """Return the current tag of the repo at path, or an empty str."""
-        result = subprocess.run(["git", "-C", path, "describe", "--exact-match", "--tags"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         tag = ""
-        if result.returncode == 0:
-            tag = result.stdout.decode("utf-8").replace("\n", "")
+        try:
+            result = subprocess.run(["git", "-C", path, "describe", "--exact-match", "--tags"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                tag = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return tag
+
         return tag
 
     @classmethod
     def get_branch(cls, path: Path) -> str:
         """Return the current branch of the repo at path, or an empty str."""
-        result = subprocess.run(["git", "-C", path, "symbolic-ref", "--short", "-q", "HEAD"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         branch = ""
-        if result.returncode == 0:
-            branch = result.stdout.decode("utf-8").replace("\n", "")
+        try:
+            result = subprocess.run(["git", "-C", path, "symbolic-ref", "--short", "-q", "HEAD"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                branch = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return branch
+
         return branch
 
     @classmethod
     def get_remote_branch(cls, path: Path) -> str:
         """Return. the remote of the current branch of the repo at path, or an empty str."""
-        result = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         remote_branch = ""
-        if result.returncode == 0:
-            remote_branch = result.stdout.decode("utf-8").replace("\n", "")
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                remote_branch = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return remote_branch
+
         return remote_branch
 
     @classmethod
@@ -335,13 +370,16 @@ class GitInfo:
 def is_git_dirty(path: Path) -> bool:
     """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
     log.debug(f"  Checking if directory \"{path}\" is dirty")
-    result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode == 0:
-        result = subprocess.run(["git", "-C", path, "diff", "--cached", "--quiet", "--exit-code"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         if result.returncode == 0:
-            return False
+            result = subprocess.run(["git", "-C", path, "diff", "--cached", "--quiet", "--exit-code"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if result.returncode == 0:
+                return False
+    except subprocess.CalledProcessError:
+        return True
 
     return True
 
@@ -382,9 +420,12 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
             # if the repo is clean we can safely switch branches
             if git_tag is not None:
                 log.debug(f"    Repo is not dirty, checking out requested git tag \"{git_tag}\"")
-                result = subprocess.run(["git", "-C", checkout_dir, "checkout", git_tag],
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                pretty_print_process(result, 4)
+                try:
+                    result = subprocess.run(["git", "-C", checkout_dir, "checkout", git_tag],
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                    pretty_print_process(result, 4)
+                except subprocess.CalledProcessError as result:
+                    pretty_print_process(result, 4)
     else:
         clone_dependency_repo(git, git_tag, checkout_dir)
 
@@ -749,9 +790,10 @@ def main(parser: argparse.ArgumentParser):
 
             entry = dict()
 
-            remote_result = subprocess.run(["git", "-C", subdir_path, "config", "--get", "remote.origin.url"],
-                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if remote_result.returncode != 0:
+            try:
+                remote_result = subprocess.run(["git", "-C", subdir_path, "config", "--get", "remote.origin.url"],
+                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            except subprocess.CalledProcessError:
                 log.warning(f"Skipping {name} because remote could not be determined.")
                 continue
             remote = remote_result.stdout.decode("utf-8").replace("\n", "")
@@ -761,20 +803,22 @@ def main(parser: argparse.ArgumentParser):
                 continue
             entry["git"] = remote
             # TODO: check if there already is another config entry with this remote
-            branch_result = subprocess.run(["git", "-C", subdir_path, "symbolic-ref", "--short", "-q", "HEAD"],
-                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if branch_result.returncode == 0:
-                branch = branch_result.stdout.decode("utf-8").replace("\n", "")
-                log.debug(f"  branch: {branch}")
-                entry["git_tag"] = branch
-            else:
-                tag_result = subprocess.run(["git", "-C", subdir_path, "describe", "--exact-match", "--tags"],
-                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if tag_result.returncode == 0:
-                    tag = tag_result.stdout.decode("utf-8").replace("\n", "")
-                    log.debug(f"  tag: {tag}")
-                    entry["git_tag"] = tag
-                else:
+            try:
+                branch_result = subprocess.run(["git", "-C", subdir_path, "symbolic-ref", "--short", "-q", "HEAD"],
+                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                if branch_result.returncode == 0:
+                    branch = branch_result.stdout.decode("utf-8").replace("\n", "")
+                    log.debug(f"  branch: {branch}")
+                    entry["git_tag"] = branch
+            except subprocess.CalledProcessError:
+                try:
+                    tag_result = subprocess.run(["git", "-C", subdir_path, "describe", "--exact-match", "--tags"],
+                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                    if tag_result.returncode == 0:
+                        tag = tag_result.stdout.decode("utf-8").replace("\n", "")
+                        log.debug(f"  tag: {tag}")
+                        entry["git_tag"] = tag
+                except subprocess.CalledProcessError:
                     log.warning(f"Skipping {name} because no branch or tag could be determined.")
                     continue
             new_config[name] = entry
