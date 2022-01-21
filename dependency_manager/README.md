@@ -1,10 +1,10 @@
 # Dependency Manager for EVerest
 
-  - [Dependency Manager for EVerest](#dependency-manager-for-everest)
+- [Dependency Manager for EVerest](#dependency-manager-for-everest)
     - [Install and Quick Start](#install-and-quick-start)
-      - [Installing edm](#installing-edm)
-      - [Enabling CPM_SOURCE_CACHE](#enabling-cpm_source_cache)
-      - [Python packages needed to run edm](#python-packages-needed-to-run-edm)
+        - [Installing edm](#installing-edm)
+        - [Enabling CPM_SOURCE_CACHE](#enabling-cpm_source_cache)
+        - [Python packages needed to run edm](#python-packages-needed-to-run-edm)
     - [Setting up CMake integration](#setting-up-cmake-integration)
     - [Setting up a workspace](#setting-up-a-workspace)
     - [Updating a workspace](#updating-a-workspace)
