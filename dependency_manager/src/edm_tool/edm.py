@@ -367,6 +367,284 @@ class GitInfo:
         return git_info
 
 
+class EDM:
+    """Provide dependecy management functionality."""
+
+    @classmethod
+    def show_git_info(cls, working_dir: Path, workspace: str, git_fetch: bool):
+        """Log information about git repositories."""
+        git_info_working_dir = working_dir
+        if workspace:
+            git_info_working_dir = Path(workspace).expanduser().resolve()
+            log.info("Workspace provided, executing git-info in workspace")
+        log.info(f"Git info for \"{git_info_working_dir}\":")
+        if git_fetch:
+            log.info("Using git-fetch to update remote information. This might take a few seconds.")
+        git_info = GitInfo.get_git_info(git_info_working_dir, git_fetch)
+
+        dirty_count = 0
+        repo_count = 0
+        for path, info in git_info.items():
+            if not info["is_repo"]:
+                log.debug(f"\"{path.name}\" is not a git repository.")
+                continue
+            repo_count += 1
+            tag_or_branch = ""
+            if info["tag"]:
+                tag_or_branch += f" @ tag: {info['tag']}"
+            if info["branch"]:
+                tag_or_branch += f" @ branch: {info['branch']}"
+
+            remote_info = ""
+            if info["detached"]:
+                remote_info = f" [{Color.YELLOW}detached HEAD{Color.CLEAR}]"
+            else:
+                if "branch" in info and "remote_branch" in info:
+                    remote_info = (f" [remote: {Color.RED}{info['remote_branch']}{Color.CLEAR}]")
+                    behind_ahead = ""
+                    if "behind" in info and info["behind"] and info["behind"] != "0":
+                        behind_ahead += f"behind {Color.RED}{info['behind']}{Color.CLEAR}"
+                    if "ahead" in info and info["ahead"] and info["ahead"] != "0":
+                        if behind_ahead:
+                            behind_ahead += " "
+                        behind_ahead += f"ahead {Color.GREEN}{info['ahead']}{Color.CLEAR}"
+                    if behind_ahead:
+                        remote_info += f" [{behind_ahead}]"
+            dirty = f"[{Color.GREEN}clean{Color.CLEAR}]"
+            if info["dirty"]:
+                dirty = f"[{Color.RED}dirty{Color.CLEAR}]"
+                dirty_count += 1
+
+            log.info(f"\"{Color.GREEN}{path.name}{Color.CLEAR}\"{tag_or_branch}{remote_info} {dirty}")
+
+        if dirty_count > 0:
+            log.info(f"{dirty_count}/{repo_count} repositories are dirty.")
+
+    @classmethod
+    def setup_workspace_from_config(cls, workspace: str, config: str, update: bool, create_vscode_workspace: bool):
+        """Setup a workspace from the provided config, update an existing workspace if specified."""
+        workspace_dir = Path(workspace).expanduser().resolve()
+
+        config_path = Path(config).expanduser().resolve()
+        if config_path.exists():
+            log.info(f"Using config \"{config_path}\"")
+        else:
+            log.error(f"Config file \"{config_path}\" does not exists, stopping.")
+            sys.exit(1)
+        config = parse_config(config_path)
+        try:
+            workspace_checkout = setup_workspace(workspace_dir, config, update)
+        except LocalDependencyCheckoutError:
+            log.error("Could not setup workspace. Stopping.")
+            sys.exit(1)
+        # copy config into workspace
+        try:
+            config_destination_path = workspace_dir / "workspace-config.yaml"
+            shutil.copyfile(config_path, config_destination_path)
+            log.info(f"Copied config into \"{config_destination_path}\"")
+        except shutil.SameFileError:
+            log.info(f"Did not copy workspace config because source and destination are the same \"{config_path}\"")
+
+        if create_vscode_workspace:
+            create_vscode_workspace(workspace_dir, workspace_checkout)
+
+    @classmethod
+    def config_from_dependencies(cls, dependencies: dict, external_in_config: bool, include_remotes: list) -> dict:
+        """Assemble a config from the given dependencies."""
+        new_config = {}
+        if external_in_config:
+            new_config = {**new_config, **dependencies}
+            log.debug("Including external dependencies in generated config.")
+        else:
+            for name, entry in dependencies.items():
+                if pattern_matches(entry["git"], include_remotes):
+                    log.debug(f"Adding \"{name}\" to config. ")
+                    new_config[name] = entry
+                else:
+                    log.debug(f"Did not add \"{name}\" to generated config because it is an external dependency.")
+
+        return new_config
+
+    @classmethod
+    def create_config(cls, working_dir: Path, new_config: dict, external_in_config: bool, include_remotes: list) -> dict:
+        """Scan all first-level subdirectories in working_dir for git repositories that might have been missed."""
+        for subdir in list(working_dir.glob("*/")):
+            subdir_path = Path(subdir)
+            name = subdir_path.name
+            if name in new_config:
+                log.debug(f"Skipping {name} which already is in config.")
+                continue
+            # FIXME: change this when we support alias info for a repo.
+            # then this name might not be not equal to the dep name anymore
+            if not subdir_path.is_dir():
+                log.debug(f"Skipping {name} because it is not a directory.")
+                continue
+            log.debug(f"Checking {subdir_path}: {subdir_path.name}")
+
+            entry = {}
+
+            try:
+                remote_result = subprocess.run(["git", "-C", subdir_path, "config", "--get", "remote.origin.url"],
+                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            except subprocess.CalledProcessError:
+                log.warning(f"Skipping {name} because remote could not be determined.")
+                continue
+            remote = remote_result.stdout.decode("utf-8").replace("\n", "")
+            log.debug(f"  remote: {remote}")
+            if not external_in_config and not pattern_matches(remote, include_remotes):
+                log.debug(f"Skipping {name} because it is an external dependency.")
+                continue
+            entry["git"] = remote
+            # TODO: check if there already is another config entry with this remote
+            try:
+                branch_result = subprocess.run(["git", "-C", subdir_path, "symbolic-ref", "--short", "-q", "HEAD"],
+                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                if branch_result.returncode == 0:
+                    branch = branch_result.stdout.decode("utf-8").replace("\n", "")
+                    log.debug(f"  branch: {branch}")
+                    entry["git_tag"] = branch
+            except subprocess.CalledProcessError:
+                try:
+                    tag_result = subprocess.run(["git", "-C", subdir_path, "describe", "--exact-match", "--tags"],
+                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                    if tag_result.returncode == 0:
+                        tag = tag_result.stdout.decode("utf-8").replace("\n", "")
+                        log.debug(f"  tag: {tag}")
+                        entry["git_tag"] = tag
+                except subprocess.CalledProcessError:
+                    log.warning(f"Skipping {name} because no branch or tag could be determined.")
+                    continue
+            new_config[name] = entry
+
+        return new_config
+
+    @classmethod
+    def write_config(cls, new_config: dict, out_path: str):
+        """Write the given config to the given path."""
+        new_config_path = Path(out_path).expanduser().resolve()
+        for config_entry_name, _ in new_config.items():
+            log.info(f"Adding \"{Color.GREEN}{config_entry_name}{Color.CLEAR}\" to config.")
+        with open(new_config_path, 'w', encoding='utf-8') as new_config_file:
+            yaml.dump(new_config, new_config_file)
+            log.info(f"Successfully saved config \"{new_config_path}\".")
+
+    @classmethod
+    def pull(cls, working_dir: Path, repos: list):
+        """Pull all repos in working_dir or a restricted list of repos when provided."""
+        pull_info = GitInfo.pull_all(working_dir, repos)
+        pull_error_count = 0
+        repo_count = 0
+        for path, info in pull_info.items():
+            if info["is_repo"]:
+                repo_count += 1
+                pulled = f"[{Color.GREEN}pulled{Color.CLEAR}]"
+                if not info["pull_worked"]:
+                    pulled = f"[{Color.RED}error during git-pull{Color.CLEAR}]"
+                    pull_error_count += 1
+
+                log.info(f"\"{Color.GREEN}{path.name}{Color.CLEAR}\"{pulled}")
+            else:
+                log.debug(f"\"{path.name}\" is not a git repository.")
+        if pull_error_count > 0:
+            log.info(f"{pull_error_count}/{repo_count} repositories could not be pulled.")
+
+    @classmethod
+    def scan_dependencies(cls, working_dir: Path, include_deps: list) -> dict:
+        """Scan working_dir for dependencies."""
+        log.info(f"Scanning \"{working_dir}\" for dependencies.")
+        dependencies_files = list(working_dir.glob("**/dependencies.yaml")) + \
+            list(working_dir.glob("**/dependencies.yml"))
+
+        dependencies = {}
+        for dependencies_file in dependencies_files:
+            if dependencies_file.is_file():
+                # filter _deps folders
+                if not include_deps:
+                    relative_path = dependencies_file.relative_to(working_dir).parent.as_posix()
+                    if "_deps/" in relative_path:
+                        log.info(
+                            f"Ignoring dependencies in \"{dependencies_file}\" "
+                            f"because this file is located in a \"_deps\" subdirectory.")
+                        continue
+                log.info(f"Parsing dependencies file: {dependencies_file}")
+                with open(dependencies_file, encoding='utf-8') as dep:
+                    try:
+                        dependencies_yaml = yaml.safe_load(dep)
+                        if dependencies_yaml is not None:
+                            dependencies = {**dependencies, **dependencies_yaml}
+                    except yaml.YAMLError as e:
+                        log.error(f"Error parsing yaml of \"{dependencies_file}\": {e}")
+
+        return dependencies
+
+    @classmethod
+    def parse_workspace_files(cls, workspace_files: list) -> dict:
+        """Parse the given list of workspace_files and return a workspace dict when exactly one workspace file is in the list"""
+        workspace = {}
+        if len(workspace_files) == 1:
+            workspace_file = Path(workspace_files[0]).expanduser().resolve()
+            if workspace_file.is_file():
+                log.info(f"Using workspace file: {workspace_file}")
+                with open(workspace_file, encoding='utf-8') as wsp:
+                    try:
+                        workspace_yaml = yaml.safe_load(wsp)
+                        if workspace_yaml is not None:
+                            workspace = {**workspace, **workspace_yaml}
+                    except yaml.YAMLError as e:
+                        log.error(f"Error parsing yaml of {workspace_file}: {e}")
+        return workspace
+
+    @classmethod
+    def checkout_local_dependencies(cls, workspace: dict, workspace_arg: str, dependencies: dict) -> list:
+        """Checkout local dependencies in the workspace."""
+        checkout = []
+        if "local_dependencies" in workspace:
+            workspace_dir = None
+            # workspace given by command line always takes precedence
+            if workspace_arg is not None:
+                workspace_dir = Path(workspace_arg).expanduser().resolve()
+                log.info(f"Using workspace directory \"{workspace_dir}\" from command line.")
+            elif "workspace" in workspace:
+                workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
+                log.info(f"Using workspace directory \"{workspace_dir}\" from workspace.yaml.")
+            else:
+                print("Cannot checkout requested dependencies without a workspace directory, stopping.")
+                sys.exit(1)
+            for name, entry in workspace["local_dependencies"].items():
+                if name not in dependencies:
+                    log.debug(f"{name}: listed in workspace.yaml, but not in dependencies. Ignoring.")
+                    continue
+                checkout_dir = workspace_dir / name
+                git_tag = None
+                if "git_tag" in dependencies[name]:
+                    git_tag = dependencies[name]["git_tag"]
+                if entry is not None and "git_tag" in entry:
+                    git_tag = entry["git_tag"]
+                checkout.append(checkout_local_dependency(name, dependencies[name]["git"], git_tag, checkout_dir))
+
+        return checkout
+
+    @classmethod
+    def write_cmake(cls, workspace: dict, checkout: list, dependencies: dict, out_file: Path):
+        """Generate a CMake file containing the dependencies in the given out_file."""
+        templates_path = Path(__file__).parent / "templates"
+        env = Environment(
+            loader=FileSystemLoader(templates_path),
+            trim_blocks=True,
+        )
+        env.filters['quote'] = quote
+
+        cpm_template = env.get_template("cpm.jinja")
+        render = cpm_template.render({
+            "dependencies": dependencies,
+            "checkout": checkout,
+            "workspace": workspace})
+
+        with open(out_file, 'w', encoding='utf-8') as out:
+            log.info(f"Saving dependencies in: {out_file}")
+            out.write(render)
+
+
 def is_git_dirty(path: Path) -> bool:
     """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
     log.debug(f"  Checking if directory \"{path}\" is dirty")
@@ -583,23 +861,29 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(parser: argparse.ArgumentParser):
-    """The main entrypoint of edm. Provides different functionality based on the given command line arguments."""
-    args = parser.parse_args()
-    if args.verbose:
+def setup_logging(verbose: bool, nocolor: bool):
+    """Setup logging, choosing logger level and if colorful log output is requested."""
+    if verbose:
         log.setLevel(level=logging.DEBUG)
     else:
         log.setLevel(level=logging.INFO)
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(ColorFormatter(color=not args.nocolor))
+    console_handler.setFormatter(ColorFormatter(color=not nocolor))
     log.addHandler(console_handler)
 
-    working_dir = Path(args.working_dir).expanduser().resolve()
-
-    if not args.nocolor:
+    if not nocolor:
         log.debug(
             "Using \033[1;31mc\033[1;33mo\033[93ml\033[92mo\033[94mr\033[34mf\033[95mu\033[35ml\033[0m \033[1m"
             "output\033[0m")
+
+
+def main(parser: argparse.ArgumentParser):
+    """The main entrypoint of edm. Provides different functionality based on the given command line arguments."""
+    args = parser.parse_args()
+
+    setup_logging(args.verbose, args.nocolor)
+
+    working_dir = Path(args.working_dir).expanduser().resolve()
 
     if not os.environ.get("CPM_SOURCE_CACHE"):
         log.warning("CPM_SOURCE_CACHE environment variable is not set, this might lead to unintended behavior.")
@@ -613,69 +897,11 @@ def main(parser: argparse.ArgumentParser):
         sys.exit(0)
 
     if args.git_pull is not None:
-        pull_info = GitInfo.pull_all(working_dir, repos=args.git_pull)
-        pull_error_count = 0
-        repo_count = 0
-        for path, info in pull_info.items():
-            if info["is_repo"]:
-                repo_count += 1
-                pulled = f"[{Color.GREEN}pulled{Color.CLEAR}]"
-                if not info["pull_worked"]:
-                    pulled = f"[{Color.RED}error during git-pull{Color.CLEAR}]"
-                    pull_error_count += 1
-
-                log.info(f"\"{Color.GREEN}{path.name}{Color.CLEAR}\"{pulled}")
-            else:
-                log.debug(f"\"{path.name}\" is not a git repository.")
-        if pull_error_count > 0:
-            log.info(f"{pull_error_count}/{repo_count} repositories could not be pulled.")
+        EDM.pull(working_dir, repos=args.git_pull)
         sys.exit(0)
 
     if args.git_info:
-        git_info_working_dir = working_dir
-        if args.workspace:
-            git_info_working_dir = Path(args.workspace).expanduser().resolve()
-            log.info("Workspace provided, executing git-info in workspace")
-        log.info(f"Git info for \"{git_info_working_dir}\":")
-        if args.git_fetch:
-            log.info("Using git-fetch to update remote information. This might take a few seconds.")
-        git_info = GitInfo.get_git_info(git_info_working_dir, args.git_fetch)
-        dirty_count = 0
-        repo_count = 0
-        for path, info in git_info.items():
-            if info["is_repo"]:
-                repo_count += 1
-                tag_or_branch = ""
-                if info["tag"]:
-                    tag_or_branch += f" @ tag: {info['tag']}"
-                if info["branch"]:
-                    tag_or_branch += f" @ branch: {info['branch']}"
-
-                remote_info = ""
-                if info["detached"]:
-                    remote_info = f" [{Color.YELLOW}detached HEAD{Color.CLEAR}]"
-                else:
-                    if "branch" in info and "remote_branch" in info:
-                        remote_info = (f" [remote: {Color.RED}{info['remote_branch']}{Color.CLEAR}]")
-                        behind_ahead = ""
-                        if "behind" in info and info["behind"] and info["behind"] != "0":
-                            behind_ahead += f"behind {Color.RED}{info['behind']}{Color.CLEAR}"
-                        if "ahead" in info and info["ahead"] and info["ahead"] != "0":
-                            if behind_ahead:
-                                behind_ahead += " "
-                            behind_ahead += f"ahead {Color.GREEN}{info['ahead']}{Color.CLEAR}"
-                        if behind_ahead:
-                            remote_info += f" [{behind_ahead}]"
-                dirty = f"[{Color.GREEN}clean{Color.CLEAR}]"
-                if info["dirty"]:
-                    dirty = f"[{Color.RED}dirty{Color.CLEAR}]"
-                    dirty_count += 1
-
-                log.info(f"\"{Color.GREEN}{path.name}{Color.CLEAR}\"{tag_or_branch}{remote_info} {dirty}")
-            else:
-                log.debug(f"\"{path.name}\" is not a git repository.")
-        if dirty_count > 0:
-            log.info(f"{dirty_count}/{repo_count} repositories are dirty.")
+        EDM.show_git_info(working_dir, args.workspace, args.git_fetch)
         sys.exit(0)
 
     if not args.config and not args.cmake and not args.create_config:
@@ -696,42 +922,14 @@ def main(parser: argparse.ArgumentParser):
             log.error("A workspace path must be provided if supplying a config. Stopping.")
             sys.exit(1)
 
-        workspace_dir = Path(args.workspace).expanduser().resolve()
-
-        config_path = Path(args.config).expanduser().resolve()
-        if config_path.exists():
-            log.info(f"Using config \"{config_path}\"")
-        else:
-            log.error(f"Config file \"{config_path}\" does not exists, stopping.")
-            sys.exit(1)
-        config = parse_config(config_path)
-        try:
-            workspace_checkout = setup_workspace(workspace_dir, config, args.update)
-        except LocalDependencyCheckoutError:
-            log.error("Could not setup workspace. Stopping.")
-            sys.exit(1)
-        # copy config into workspace
-        try:
-            config_destination_path = workspace_dir / "workspace-config.yaml"
-            shutil.copyfile(config_path, config_destination_path)
-            log.info(f"Copied config into \"{config_destination_path}\"")
-        except shutil.SameFileError:
-            log.info(f"Did not copy workspace config because source and destination are the same \"{config_path}\"")
-
-        if args.create_vscode_workspace:
-            create_vscode_workspace(workspace_dir, workspace_checkout)
-
+        EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
         sys.exit(0)
 
     if not args.cmake and not args.create_config:
         log.error("FIXME")
         sys.exit(1)
 
-    log.info(f"Scanning \"{working_dir}\" for dependencies.")
-
     out_file = Path(args.out).expanduser().resolve()
-
-    dependencies_files = list(working_dir.glob("**/dependencies.yaml")) + list(working_dir.glob("**/dependencies.yml"))
 
     workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
     if len(workspace_files) > 1:
@@ -739,95 +937,13 @@ def main(parser: argparse.ArgumentParser):
             f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
         sys.exit(1)
 
-    dependencies = {}
-    for dependencies_file in dependencies_files:
-        if dependencies_file.is_file():
-            # filter _deps folders
-            if not args.include_deps:
-                relative_path = dependencies_file.relative_to(working_dir).parent.as_posix()
-                if "_deps/" in relative_path:
-                    log.info(
-                        f"Ignoring dependencies in \"{dependencies_file}\" "
-                        f"because this file is located in a \"_deps\" subdirectory.")
-                    continue
-            log.info(f"Parsing dependencies file: {dependencies_file}")
-            with open(dependencies_file, encoding='utf-8') as dep:
-                try:
-                    dependencies_yaml = yaml.safe_load(dep)
-                    if dependencies_yaml is not None:
-                        dependencies = {**dependencies, **dependencies_yaml}
-                except yaml.YAMLError as e:
-                    log.error(f"Error parsing yaml of \"{dependencies_file}\": {e}")
+    dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
 
     if args.create_config:
-        new_config_path = Path(args.create_config).expanduser().resolve()
         log.info("Creating config")
-        new_config = {}
-        if args.external_in_config:
-            new_config = {**new_config, **dependencies}
-            log.debug("Including external dependencies in generated config.")
-        else:
-            for name, entry in dependencies.items():
-                if pattern_matches(entry["git"], args.include_remotes):
-                    log.debug(f"Adding \"{name}\" to config. ")
-                    new_config[name] = entry
-                else:
-                    log.debug(f"Did not add \"{name}\" to generated config because it is an external dependency.")
-        # now scan all first-level subdirectories in working_dir for git repositories that might have been missed
-        subdirs = list(working_dir.glob("*/"))
-        for subdir in subdirs:
-            subdir_path = Path(subdir)
-            name = subdir_path.name
-            if name in new_config:
-                log.debug(f"Skipping {name} which already is in config.")
-                continue
-            # FIXME: change this when we support alias info for a repo.
-            # then this name might not be not equal to the dep name anymore
-            if not subdir_path.is_dir():
-                log.debug(f"Skipping {name} because it is not a directory.")
-                continue
-            log.debug(f"Checking {subdir_path}: {subdir_path.name}")
-
-            entry = {}
-
-            try:
-                remote_result = subprocess.run(["git", "-C", subdir_path, "config", "--get", "remote.origin.url"],
-                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            except subprocess.CalledProcessError:
-                log.warning(f"Skipping {name} because remote could not be determined.")
-                continue
-            remote = remote_result.stdout.decode("utf-8").replace("\n", "")
-            log.debug(f"  remote: {remote}")
-            if not args.external_in_config and not pattern_matches(remote, args.include_remotes):
-                log.debug(f"Skipping {name} because it is an external dependency.")
-                continue
-            entry["git"] = remote
-            # TODO: check if there already is another config entry with this remote
-            try:
-                branch_result = subprocess.run(["git", "-C", subdir_path, "symbolic-ref", "--short", "-q", "HEAD"],
-                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                if branch_result.returncode == 0:
-                    branch = branch_result.stdout.decode("utf-8").replace("\n", "")
-                    log.debug(f"  branch: {branch}")
-                    entry["git_tag"] = branch
-            except subprocess.CalledProcessError:
-                try:
-                    tag_result = subprocess.run(["git", "-C", subdir_path, "describe", "--exact-match", "--tags"],
-                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                    if tag_result.returncode == 0:
-                        tag = tag_result.stdout.decode("utf-8").replace("\n", "")
-                        log.debug(f"  tag: {tag}")
-                        entry["git_tag"] = tag
-                except subprocess.CalledProcessError:
-                    log.warning(f"Skipping {name} because no branch or tag could be determined.")
-                    continue
-            new_config[name] = entry
-
-        for config_entry_name, _ in new_config.items():
-            log.info(f"Adding \"{Color.GREEN}{config_entry_name}{Color.CLEAR}\" to config.")
-        with open(new_config_path, 'w', encoding='utf-8') as new_config_file:
-            yaml.dump(new_config, new_config_file)
-            log.info(f"Successfully saved config \"{new_config_path}\".")
+        new_config = EDM.config_from_dependencies(dependencies, args.external_in_config, args.include_remotes)
+        new_config = EDM.create_config(working_dir, new_config, args.external_in_config, args.include_remotes)
+        EDM.write_config(new_config, args.create_config)
         sys.exit(0)
 
     if not args.cmake:
@@ -835,60 +951,9 @@ def main(parser: argparse.ArgumentParser):
                   "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
         sys.exit(1)
 
-    workspace = {}
-    if len(workspace_files) == 1:
-        workspace_file = Path(workspace_files[0]).expanduser().resolve()
-        if workspace_file.is_file():
-            log.info(f"Using workspace file: {workspace_file}")
-            with open(workspace_file, encoding='utf-8') as wsp:
-                try:
-                    workspace_yaml = yaml.safe_load(wsp)
-                    if workspace_yaml is not None:
-                        workspace = {**workspace, **workspace_yaml}
-                except yaml.YAMLError as e:
-                    log.error(f"Error parsing yaml of {workspace_file}: {e}")
-
-    checkout = []
-    if "local_dependencies" in workspace:
-        workspace_dir = None
-        # workspace given by command line always takes precedence
-        if args.workspace is not None:
-            workspace_dir = Path(args.workspace).expanduser().resolve()
-            log.info(f"Using workspace directory \"{workspace_dir}\" from command line.")
-        elif "workspace" in workspace:
-            workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
-            log.info(f"Using workspace directory \"{workspace_dir}\" from workspace.yaml.")
-        else:
-            print("Cannot checkout requested dependencies without a workspace directory, stopping.")
-            sys.exit(1)
-        for name, entry in workspace["local_dependencies"].items():
-            if name not in dependencies:
-                log.debug(f"{name}: listed in workspace.yaml, but not in dependencies. Ignoring.")
-                continue
-            checkout_dir = workspace_dir / name
-            git_tag = None
-            if "git_tag" in dependencies[name]:
-                git_tag = dependencies[name]["git_tag"]
-            if entry is not None and "git_tag" in entry:
-                git_tag = entry["git_tag"]
-            checkout.append(checkout_local_dependency(name, dependencies[name]["git"], git_tag, checkout_dir))
-
-    templates_path = Path(__file__).parent / "templates"
-    env = Environment(
-        loader=FileSystemLoader(templates_path),
-        trim_blocks=True,
-    )
-    env.filters['quote'] = quote
-
-    cpm_template = env.get_template("cpm.jinja")
-    render = cpm_template.render({
-        "dependencies": dependencies,
-        "checkout": checkout,
-        "workspace": workspace})
-
-    with open(out_file, 'w', encoding='utf-8') as out:
-        log.info(f"Saving dependencies in: {out_file}")
-        out.write(render)
+    workspace = EDM.parse_workspace_files(workspace_files)
+    checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
+    EDM.write_cmake(workspace, checkout, dependencies, out_file)
 
 
 if __name__ == "__main__":
