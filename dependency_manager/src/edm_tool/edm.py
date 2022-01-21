@@ -645,23 +645,6 @@ class EDM:
             out.write(render)
 
 
-def is_git_dirty(path: Path) -> bool:
-    """Use git diff to check if the provided directory has uncommitted changes, ignoring untracked files."""
-    log.debug(f"  Checking if directory \"{path}\" is dirty")
-    try:
-        result = subprocess.run(["git", "-C", path, "diff", "--quiet", "--exit-code"],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-        if result.returncode == 0:
-            result = subprocess.run(["git", "-C", path, "diff", "--cached", "--quiet", "--exit-code"],
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            if result.returncode == 0:
-                return False
-    except subprocess.CalledProcessError:
-        return True
-
-    return True
-
-
 def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path) -> dict:
     """
     Clone local dependency into checkout_dir.
@@ -692,7 +675,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
     if checkout_dir.exists():
         log.debug(f"    ... the directory for dependency \"{name}\" already exists at \"{checkout_dir}\".")
         # check if git is dirty
-        if is_git_dirty(checkout_dir):
+        if GitInfo.is_dirty(checkout_dir):
             log.debug("    Repo is dirty, nothing will be done to this repo.")
         else:
             # if the repo is clean we can safely switch branches
