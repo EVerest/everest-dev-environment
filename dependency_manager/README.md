@@ -1,16 +1,16 @@
 # Dependency Manager for EVerest
 
 - [Dependency Manager for EVerest](#dependency-manager-for-everest)
-    - [Install and Quick Start](#install-and-quick-start)
-        - [Installing edm](#installing-edm)
-        - [Enabling CPM_SOURCE_CACHE](#enabling-cpm_source_cache)
-        - [Python packages needed to run edm](#python-packages-needed-to-run-edm)
-    - [Setting up CMake integration](#setting-up-cmake-integration)
-    - [Setting up a workspace](#setting-up-a-workspace)
-    - [Updating a workspace](#updating-a-workspace)
-    - [Using the EDM CMake module and dependencies.yaml](#using-the-edm-cmake-module-and-dependenciesyaml)
-    - [Create a workspace config from an existing directory tree](#create-a-workspace-config-from-an-existing-directory-tree)
-    - [Git information at a glance](#git-information-at-a-glance)
+  - [Install and Quick Start](#install-and-quick-start)
+    - [Installing edm](#installing-edm)
+    - [Enabling CPM_SOURCE_CACHE](#enabling-cpm_source_cache)
+    - [Python packages needed to run edm](#python-packages-needed-to-run-edm)
+  - [Setting up CMake integration](#setting-up-cmake-integration)
+  - [Setting up a workspace](#setting-up-a-workspace)
+  - [Updating a workspace](#updating-a-workspace)
+  - [Using the EDM CMake module and dependencies.yaml](#using-the-edm-cmake-module-and-dependenciesyaml)
+  - [Create a workspace config from an existing directory tree](#create-a-workspace-config-from-an-existing-directory-tree)
+  - [Git information at a glance](#git-information-at-a-glance)
 
 ## Install and Quick Start
 To install the **edm** dependency manager for EVerest you have to perform the following steps.
@@ -64,9 +64,9 @@ export CPM_SOURCE_CACHE=$HOME/.cache/CPM
 The following Python3 packages are needed to run the **edm** dependency manager.
 If you installed **edm** using the guide above they were already installed automatically.
 
-  - Python >= 3.6
-  - Jinja2 >= 3.0
-  - PyYAML >= 5.4
+- Python >= 3.6
+- Jinja2 >= 3.0
+- PyYAML >= 5.4
 
 ## Setting up CMake integration
 To use the **EDM** CMake module you **must** register it in the [CMake package registry](https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/Package-Registry#user).
