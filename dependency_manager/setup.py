@@ -1,9 +1,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 - 2021 Pionix GmbH and Contributors to EVerest
+# Copyright 2020 - 2022 Pionix GmbH and Contributors to EVerest
 #
-"""Everest Dependency Manager
-"""
+"""Everest Dependency Manager."""
 
 from setuptools import setup, find_packages
 import pathlib
@@ -14,7 +13,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
     name='edm_tool',
-    version='0.1.3',
+    version='0.1.4',
     description='A simple dependency manager',
     long_description=long_description,
     long_description_content_type='text/markdown',

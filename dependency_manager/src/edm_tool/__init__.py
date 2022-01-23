@@ -1,13 +1,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 - 2021 Pionix GmbH and Contributors to EVerest
+# Copyright 2020 - 2022 Pionix GmbH and Contributors to EVerest
 #
+"""Everest Dependency Manager."""
 from edm_tool import edm
 
 
 def get_parser():
+    """Return the command line parser."""
     return edm.get_parser()
 
 
 def main():
+    """Main entrypoint of edm."""
     edm.main(get_parser())
