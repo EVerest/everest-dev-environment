@@ -628,7 +628,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
     """
     Clone local dependency into checkout_dir.
 
-    If the directory already exists only switch branches if the git repo is not dirty or keep_branch is True
+    If the directory already exists only switch branches if the git repo is not dirty or keep_branch is False
     """
     def clone_dependency_repo(git: str, git_tag: str, checkout_dir: Path) -> None:
         """Clone given git repository at the given git_tag into checkout_dir."""
