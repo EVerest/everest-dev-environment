@@ -599,7 +599,7 @@ class EDM:
                     git_tag = dependencies[name]["git_tag"]
                 if entry is not None and "git_tag" in entry:
                     git_tag = entry["git_tag"]
-                checkout.append(checkout_local_dependency(name, dependencies[name]["git"], git_tag, checkout_dir))
+                checkout.append(checkout_local_dependency(name, dependencies[name]["git"], git_tag, checkout_dir, True))
 
         return checkout
 
@@ -624,11 +624,11 @@ class EDM:
             out.write(render)
 
 
-def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path) -> dict:
+def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path, keep_branch=False) -> dict:
     """
     Clone local dependency into checkout_dir.
 
-    If the directory already exists only switch branches if the git repo is not dirty.
+    If the directory already exists only switch branches if the git repo is not dirty or keep_branch is False
     """
     def clone_dependency_repo(git: str, git_tag: str, checkout_dir: Path) -> None:
         """Clone given git repository at the given git_tag into checkout_dir."""
@@ -656,6 +656,8 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
         # check if git is dirty
         if GitInfo.is_dirty(checkout_dir):
             log.debug("    Repo is dirty, nothing will be done to this repo.")
+        elif keep_branch:
+            log.debug("    Keeping currently checked out branch.")
         else:
             # if the repo is clean we can safely switch branches
             if git_tag is not None:
@@ -753,7 +755,7 @@ def get_parser() -> argparse.ArgumentParser:
     """Return the argument parser containign all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
-    parser.add_argument('--version', action='version', version='%(prog)s 0.1.4')
+    parser.add_argument('--version', action='version', version='%(prog)s 0.2.0')
     parser.add_argument(
         "--workspace", metavar='WORKSPACE',
         help="Directory in which source code repositories that are explicity requested are checked out.",
