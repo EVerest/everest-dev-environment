@@ -755,7 +755,7 @@ def get_parser() -> argparse.ArgumentParser:
     """Return the argument parser containign all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
-    parser.add_argument('--version', action='version', version='%(prog)s 0.2.0')
+    parser.add_argument('--version', action='version', version='%(prog)s 0.2.1')
     parser.add_argument(
         "--workspace", metavar='WORKSPACE',
         help="Directory in which source code repositories that are explicity requested are checked out.",
