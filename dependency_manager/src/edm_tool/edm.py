@@ -751,11 +751,11 @@ def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict):
         json.dump(content, ws_file, indent="\t")
 
 
-def get_parser() -> argparse.ArgumentParser:
+def get_parser(version) -> argparse.ArgumentParser:
     """Return the argument parser containign all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
-    parser.add_argument('--version', action='version', version='%(prog)s 0.2.1')
+    parser.add_argument('--version', action='version', version=f'%(prog)s {version}')
     parser.add_argument(
         "--workspace", metavar='WORKSPACE',
         help="Directory in which source code repositories that are explicity requested are checked out.",
