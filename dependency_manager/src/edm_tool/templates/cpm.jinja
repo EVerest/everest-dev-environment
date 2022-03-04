@@ -14,6 +14,9 @@ CPMAddPackage(
     OPTIONS
         {{value["options"]|quote|join(" ")}}
 {% endif %}
+{% if "prevent_install" in value and value["prevent_install"] %}
+    EXCLUDE_FROM_ALL YES
+{% endif %}
 )
 {% else %}
 find_package(
