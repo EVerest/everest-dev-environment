@@ -4,11 +4,12 @@
 #
 """Everest Dependency Manager."""
 from edm_tool import edm
+__version__ = "0.2.2"
 
 
 def get_parser():
     """Return the command line parser."""
-    return edm.get_parser()
+    return edm.get_parser(__version__)
 
 
 def main():
