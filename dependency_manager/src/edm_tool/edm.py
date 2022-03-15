@@ -347,6 +347,16 @@ class GitInfo:
             git_info[subdir] = pull_info
         return git_info
 
+    @classmethod
+    def checkout_rev(cls, checkout_dir: Path, rev: str):
+        """Check out the given rev in the given checkout_dir"""
+        try:
+            result = subprocess.run(["git", "-C", checkout_dir, "checkout", rev],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            pretty_print_process(result, 4)
+        except subprocess.CalledProcessError as result:
+            pretty_print_process(result, 4)
+
 
 class EDM:
     """Provide dependecy management functionality."""
@@ -662,12 +672,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
             # if the repo is clean we can safely switch branches
             if git_tag is not None:
                 log.debug(f"    Repo is not dirty, checking out requested git tag \"{git_tag}\"")
-                try:
-                    result = subprocess.run(["git", "-C", checkout_dir, "checkout", git_tag],
-                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                    pretty_print_process(result, 4)
-                except subprocess.CalledProcessError as result:
-                    pretty_print_process(result, 4)
+                GitInfo.checkout_rev(checkout_dir, git_tag)
     else:
         clone_dependency_repo(git, git_tag, checkout_dir)
 
