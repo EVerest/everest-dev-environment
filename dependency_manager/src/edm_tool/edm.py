@@ -290,7 +290,7 @@ class GitInfo:
 
     @classmethod
     def get_remote_branch(cls, path: Path) -> str:
-        """Return. the remote of the current branch of the repo at path, or an empty str."""
+        """Return the remote of the current branch of the repo at path, or an empty str."""
         remote_branch = ""
         try:
             result = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
