@@ -638,7 +638,8 @@ class EDM:
                     git_tag = dependencies[name]["git_tag"]
                 if entry is not None and "git_tag" in entry:
                     git_tag = entry["git_tag"]
-                checkout.append(checkout_local_dependency(name, dependencies[name]["git"], git_tag, checkout_dir, True))
+                checkout.append(checkout_local_dependency(
+                    name, dependencies[name]["git"], git_tag, None, checkout_dir, True))
 
         return checkout
 
@@ -663,7 +664,7 @@ class EDM:
             out.write(render)
 
 
-def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path, keep_branch=False) -> dict:
+def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, checkout_dir: Path, keep_branch=False) -> dict:
     """
     Clone local dependency into checkout_dir.
 
@@ -689,6 +690,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
     log.info(f"Setting up dependency \"{Color.GREEN}{name}{Color.CLEAR}\" in workspace")
     log.debug(f"  git-remote: \"{git}\"")
     log.debug(f"  git-tag: \"{git_tag}\"")
+    log.debug(f"  git-rev: \"{git_rev}\"")
     log.debug(f"  local directory: \"{checkout_dir}\"")
     if checkout_dir.exists():
         log.debug(f"    ... the directory for dependency \"{name}\" already exists at \"{checkout_dir}\".")
@@ -704,6 +706,10 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
                 GitInfo.checkout_rev(checkout_dir, git_tag)
     else:
         clone_dependency_repo(git, git_tag, checkout_dir)
+
+    if git_rev is not None:
+        log.debug(f"    Checking out requested git rev \"{git_rev}\"")
+        GitInfo.checkout_rev(checkout_dir, git_rev)
 
     return {"name": name, "path": checkout_dir, "git_tag": git_tag}
 
@@ -728,9 +734,13 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
     for name, entry in config.items():
         checkout_dir = workspace_path / name
         git_tag = None
-        if entry is not None and "git_tag" in entry:
-            git_tag = entry["git_tag"]
-        workspace_checkout.append(checkout_local_dependency(name, entry["git"], git_tag, checkout_dir))
+        git_rev = None
+        if entry is not None:
+            if "git_tag" in entry:
+                git_tag = entry["git_tag"]
+            if "git_rev" in entry:
+                git_rev = entry["git_rev"]
+        workspace_checkout.append(checkout_local_dependency(name, entry["git"], git_tag, git_rev, checkout_dir))
 
     if len(workspace_checkout) > 0:
         log.info("Creating a workspace.yaml in each dependency directory, "
