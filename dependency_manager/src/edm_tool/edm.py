@@ -302,6 +302,19 @@ class GitInfo:
         return remote_branch
 
     @classmethod
+    def get_current_rev(cls, path: Path) -> str:
+        """Return the currently checked out ref of the repo at path, or an empty str."""
+        rev = ""
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-parse", "HEAD"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            rev = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return rev
+
+        return rev
+
+    @classmethod
     def get_git_info(cls, path: Path, fetch=False) -> dict:
         """
         Return useful information about a repository a the given path.
@@ -325,6 +338,7 @@ class GitInfo:
                 repo_info["branch"] = GitInfo.get_branch(subdir_path)
                 repo_info["dirty"] = GitInfo.is_dirty(subdir_path)
                 repo_info["detached"] = GitInfo.is_detached(subdir_path)
+                repo_info["rev"] = GitInfo.get_current_rev(subdir_path)
 
             git_info[subdir] = repo_info
         return git_info
@@ -388,7 +402,7 @@ class EDM:
 
             remote_info = ""
             if info["detached"]:
-                remote_info = f" [{Color.YELLOW}detached HEAD{Color.CLEAR}]"
+                remote_info = f" [{Color.YELLOW}detached HEAD @ {info['rev']}{Color.CLEAR}]"
             else:
                 if "branch" in info and "remote_branch" in info:
                     remote_info = (f" [remote: {Color.RED}{info['remote_branch']}{Color.CLEAR}]")
