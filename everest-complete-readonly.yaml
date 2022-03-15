@@ -3,6 +3,9 @@ RISE-V2G:
   git_tag: master
   options:
   - THIRD_PARTY_APP_DST rise_v2g
+everest-cmake:
+  git: https://github.com/EVerest/everest-cmake.git
+  git_tag: main
 everest-core:
   git: https://github.com/EVerest/everest-core.git
   git_tag: main
