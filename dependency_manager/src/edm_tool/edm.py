@@ -522,6 +522,21 @@ class EDM:
         return new_config
 
     @classmethod
+    def create_snapshot(cls, working_dir: Path) -> dict:
+        git_info = GitInfo.get_git_info(working_dir, False)
+
+        config = parse_config(working_dir / "workspace-config.yaml")
+        for path, info in git_info.items():
+            if not info["is_repo"]:
+                log.debug(f"{path.name} is not a repo, path: {path}")
+                continue
+            if path.name not in config:
+                config[path.name] = {}
+                config[path.name]["git"] = info["git"]
+            config[path.name]["git_rev"] = info["rev"]
+        return config
+
+    @classmethod
     def write_config(cls, new_config: dict, out_path: str):
         """Write the given config to the given path."""
         new_config_path = Path(out_path).expanduser().resolve()
@@ -827,6 +842,12 @@ def get_parser(version) -> argparse.ArgumentParser:
         default=["git@github.com:EVerest/*"],
         required=False)
     parser.add_argument(
+        "--create-snapshot",
+        help="Creates a config file at the given path containing all repositories from the working directory.",
+        nargs="?",
+        const="snapshot.yaml",
+        required=False)
+    parser.add_argument(
         "--git-info", action="store_true",
         help="Show information of git repositories in working_dir")
     parser.add_argument(
@@ -887,7 +908,7 @@ def main(parser: argparse.ArgumentParser):
         EDM.show_git_info(working_dir, args.workspace, args.git_fetch)
         sys.exit(0)
 
-    if not args.config and not args.cmake and not args.create_config:
+    if not args.config and not args.cmake and not args.create_config and not args.create_snapshot:
         if args.update:
             if not args.workspace:
                 args.workspace = Path(".").expanduser().resolve()
@@ -906,6 +927,12 @@ def main(parser: argparse.ArgumentParser):
             sys.exit(1)
 
         EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+        sys.exit(0)
+
+    if args.create_snapshot:
+        log.info(f"Creating snapshot: {args.create_snapshot}")
+        snapshot = EDM.create_snapshot(working_dir)
+        EDM.write_config(snapshot, args.create_snapshot)
         sys.exit(0)
 
     if not args.cmake and not args.create_config:
