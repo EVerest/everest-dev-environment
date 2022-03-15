@@ -31,6 +31,9 @@ libmodbus:
 libocpp:
   git: git@github.com:EVerest/libocpp.git
   git_tag: main
+libslac:
+  git: git@github.com:EVerest/libslac.git
+  git_tag: main
 libsunspec:
   git: git@github.com:EVerest/libsunspec.git
   git_tag: main
