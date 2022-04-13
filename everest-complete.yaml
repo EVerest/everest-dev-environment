@@ -44,6 +44,3 @@ libtimer:
   git_tag: main
   options:
   - BUILD_EXAMPLES OFF
-open-plc-utils:
-  git: git@github.com:EVerest/ext-open-plc-utils.git
-  git_tag: master
