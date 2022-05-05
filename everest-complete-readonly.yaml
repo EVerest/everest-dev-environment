@@ -1,0 +1,46 @@
+RISE-V2G:
+  git: https://github.com/EVerest/ext-RISE-V2G.git
+  git_tag: master
+  options:
+  - THIRD_PARTY_APP_DST rise_v2g
+everest-core:
+  git: https://github.com/EVerest/everest-core.git
+  git_tag: main
+everest-dev-environment:
+  git: https://github.com/EVerest/everest-dev-environment.git
+  git_tag: main
+everest-framework:
+  git: https://github.com/EVerest/everest-framework.git
+  git_tag: main
+everest-utils:
+  git: https://github.com/EVerest/everest-utils.git
+  git_tag: main
+libfsm:
+  git: https://github.com/EVerest/libfsm.git
+  git_tag: main
+liblog:
+  git: https://github.com/EVerest/liblog.git
+  git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
+libmodbus:
+  git: https://github.com/EVerest/libmodbus.git
+  git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
+libocpp:
+  git: https://github.com/EVerest/libocpp.git
+  git_tag: main
+libslac:
+  git: https://github.com/EVerest/libslac.git
+  git_tag: main
+libsunspec:
+  git: https://github.com/EVerest/libsunspec.git
+  git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
+libtimer:
+  git: https://github.com/EVerest/libtimer.git
+  git_tag: main
+  options:
+  - BUILD_EXAMPLES OFF
