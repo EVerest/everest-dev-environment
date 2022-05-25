@@ -964,6 +964,18 @@ def git_info_handler(args):
     sys.exit(0)
 
 
+def git_pull_handler(args):
+    """Handler for the edm git pull subcommand"""
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if not args.repo_name:
+        log.info("No repo name specified, pulling all repos in the current workspace")
+        EDM.pull(working_dir, repos=None)
+    else:
+        EDM.pull(working_dir, repos=args.repo_name)
+
+
+
 def main_handler(args):
     working_dir = Path(args.working_dir).expanduser().resolve()
 
@@ -1156,6 +1168,13 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Name of the repo(s) to get info from",
         nargs="*")
     git_info_parser.set_defaults(action_handler=git_info_handler)
+
+    git_pull_parser = git_subparsers.add_parser('pull', add_help=True)
+    git_pull_parser.add_argument(
+        "repo_name",
+        help="Name of the repo(s) to pull",
+        nargs="*")
+    git_pull_parser.set_defaults(action_handler=git_pull_handler)
 
     parser.set_defaults(action_handler=main_handler)
 
