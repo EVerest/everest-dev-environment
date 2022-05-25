@@ -900,6 +900,31 @@ def list_handler(args):
         log.info(f"  {workspace_name} ({workspace_config['path']})")
 
 
+def cd_handler(args):
+    """Handler for the edm cd subcommand"""
+    log.info("Changing workspace")
+    config = load_edm_config()
+
+    if not config:
+        log.error("No edm config found")
+        sys.exit(0)
+
+    if not args.workspace_name:
+        # load last active workspace from config
+        args.workspace_name = config["edm"]["active_workspace"]
+        if not args.workspace_name:
+            log.error("No active workspace found, can't change to a workspace I don't know")
+            sys.exit(0)
+
+    if not args.workspace_name in config["workspaces"]:
+        log.error(f"Can't find workspace {args.workspace_name} in config")
+        sys.exit(0)
+
+    # TODO: change active_workspace in config before calling chdir and modify_prompt
+    os.chdir(config["workspaces"][args.workspace_name]["path"])
+    modify_prompt(args.workspace_name)
+
+
 def modify_prompt(workspace_name):
     """Modify prompt by execv-ing the current shell with PS1 set to custom prompt"""
     # TODO: support for more shells, currently this only works for bash and zsh
@@ -1096,6 +1121,13 @@ def get_parser(version) -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser('list', add_help=True)
     list_parser.set_defaults(action_handler=list_handler)
+
+    cd_parser = subparsers.add_parser('cd', add_help=True)
+    cd_parser.set_defaults(action_handler=cd_handler)
+    cd_parser.add_argument(
+        "workspace_name",
+        help="Name of the workspace to change into",
+        nargs="?")
 
     parser.set_defaults(action_handler=main_handler)
 
