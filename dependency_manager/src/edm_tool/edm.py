@@ -315,6 +315,30 @@ class GitInfo:
         return rev
 
     @classmethod
+    def get_git_repo_info(cls, repo_path: Path, fetch=False) -> dict:
+        """
+        Return useful information about a repository a the given path.
+
+        TODO: return type should be a well defined object
+        Returns an empty dictionary if the path is no git repo
+        """
+        git_info = {}
+        repo_info = {'is_repo': False}
+        if GitInfo.is_repo(repo_path):
+            repo_info["is_repo"] = True
+            if fetch:
+                repo_info["fetch_worked"] = GitInfo.fetch(repo_path)
+            repo_info["remote_branch"] = GitInfo.get_remote_branch(repo_path)
+            repo_info["behind"] = GitInfo.get_behind(repo_path)
+            repo_info["ahead"] = GitInfo.get_ahead(repo_path)
+            repo_info["tag"] = GitInfo.get_tag(repo_path)
+            repo_info["branch"] = GitInfo.get_branch(repo_path)
+            repo_info["dirty"] = GitInfo.is_dirty(repo_path)
+            repo_info["detached"] = GitInfo.is_detached(repo_path)
+            repo_info["rev"] = GitInfo.get_current_rev(repo_path)
+        return repo_info
+
+    @classmethod
     def get_git_info(cls, path: Path, fetch=False) -> dict:
         """
         Return useful information about a repository a the given path.
@@ -326,19 +350,7 @@ class GitInfo:
         subdirs = list(path.glob("*/"))
         for subdir in subdirs:
             subdir_path = Path(subdir)
-            repo_info = {'is_repo': False}
-            if GitInfo.is_repo(subdir_path):
-                repo_info["is_repo"] = True
-                if fetch:
-                    repo_info["fetch_worked"] = GitInfo.fetch(subdir_path)
-                repo_info["remote_branch"] = GitInfo.get_remote_branch(subdir_path)
-                repo_info["behind"] = GitInfo.get_behind(subdir_path)
-                repo_info["ahead"] = GitInfo.get_ahead(subdir_path)
-                repo_info["tag"] = GitInfo.get_tag(subdir_path)
-                repo_info["branch"] = GitInfo.get_branch(subdir_path)
-                repo_info["dirty"] = GitInfo.is_dirty(subdir_path)
-                repo_info["detached"] = GitInfo.is_detached(subdir_path)
-                repo_info["rev"] = GitInfo.get_current_rev(subdir_path)
+            repo_info = GitInfo.get_git_repo_info(subdir_path, fetch)
 
             git_info[subdir] = repo_info
         return git_info
@@ -376,17 +388,7 @@ class EDM:
     """Provide dependecy management functionality."""
 
     @classmethod
-    def show_git_info(cls, working_dir: Path, workspace: str, git_fetch: bool):
-        """Log information about git repositories."""
-        git_info_working_dir = working_dir
-        if workspace:
-            git_info_working_dir = Path(workspace).expanduser().resolve()
-            log.info("Workspace provided, executing git-info in workspace")
-        log.info(f"Git info for \"{git_info_working_dir}\":")
-        if git_fetch:
-            log.info("Using git-fetch to update remote information. This might take a few seconds.")
-        git_info = GitInfo.get_git_info(git_info_working_dir, git_fetch)
-
+    def print_git_info(cls, git_info):
         dirty_count = 0
         repo_count = 0
         for path, info in git_info.items():
@@ -424,6 +426,19 @@ class EDM:
 
         if dirty_count > 0:
             log.info(f"{dirty_count}/{repo_count} repositories are dirty.")
+
+    @classmethod
+    def show_git_info(cls, working_dir: Path, workspace: str, git_fetch: bool):
+        """Log information about git repositories."""
+        git_info_working_dir = working_dir
+        if workspace:
+            git_info_working_dir = Path(workspace).expanduser().resolve()
+            log.info("Workspace provided, executing git-info in workspace")
+        log.info(f"Git info for \"{git_info_working_dir}\":")
+        if git_fetch:
+            log.info("Using git-fetch to update remote information. This might take a few seconds.")
+        git_info = GitInfo.get_git_info(git_info_working_dir, git_fetch)
+        EDM.print_git_info(git_info)
 
     @classmethod
     def setup_workspace_from_config(cls, workspace: str, config: str, update: bool, create_vscode_workspace: bool):
