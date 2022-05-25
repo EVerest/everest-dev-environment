@@ -946,6 +946,24 @@ def modify_prompt(workspace_name):
     sys.exit(0)
 
 
+def git_info_handler(args):
+    """Handler for the edm git info subcommand"""
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if not args.repo_name:
+        log.info("No repo name specified, listing git info for every repo in the current workspace")
+        EDM.show_git_info(working_dir, None, True)
+    else:
+        log.info(f"Only listing git info for {', '.join(args.repo_name)}")
+        git_info = {}
+        for repo_name in args.repo_name:
+            repo_path = working_dir / repo_name
+            repo_info = GitInfo.get_git_repo_info(repo_path, True)
+            git_info[repo_path] = repo_info
+        EDM.print_git_info(git_info)
+    sys.exit(0)
+
+
 def main_handler(args):
     working_dir = Path(args.working_dir).expanduser().resolve()
 
@@ -1128,6 +1146,16 @@ def get_parser(version) -> argparse.ArgumentParser:
         "workspace_name",
         help="Name of the workspace to change into",
         nargs="?")
+
+    git_parser = subparsers.add_parser('git', add_help=True)
+    git_subparsers = git_parser.add_subparsers(help='available git commands', required=False)
+
+    git_info_parser = git_subparsers.add_parser('info', add_help=True)
+    git_info_parser.add_argument(
+        "repo_name",
+        help="Name of the repo(s) to get info from",
+        nargs="*")
+    git_info_parser.set_defaults(action_handler=git_info_handler)
 
     parser.set_defaults(action_handler=main_handler)
 
