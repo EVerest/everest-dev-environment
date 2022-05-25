@@ -886,6 +886,20 @@ def init_handler(args):
 
     modify_prompt(workspace_name=workspace_name)
 
+
+def list_handler(args):
+    """Handler for the edm list subcommand"""
+    log.info("Listing workspaces")
+    config = load_edm_config()
+
+    if not config:
+        log.info("No edm config found")
+        sys.exit(0)
+
+    for workspace_name, workspace_config in config["workspaces"].items():
+        log.info(f"  {workspace_name} ({workspace_config['path']})")
+
+
 def modify_prompt(workspace_name):
     """Modify prompt by execv-ing the current shell with PS1 set to custom prompt"""
     # TODO: support for more shells, currently this only works for bash and zsh
@@ -1079,6 +1093,9 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Name of this workspace",
         nargs="?")
     init_parser.set_defaults(action_handler=init_handler)
+
+    list_parser = subparsers.add_parser('list', add_help=True)
+    list_parser.set_defaults(action_handler=list_handler)
 
     parser.set_defaults(action_handler=main_handler)
 
