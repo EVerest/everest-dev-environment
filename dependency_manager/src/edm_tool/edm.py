@@ -14,9 +14,13 @@ from pathlib import Path, PurePath
 import subprocess
 import sys
 import shutil
+import requests
+import tempfile
 
 
 log = logging.getLogger("edm")
+edm_config_dir_path = Path("~/.config/everest").expanduser().resolve()
+edm_config_path = edm_config_dir_path / "edm.yaml"
 
 
 class LocalDependencyCheckoutError(Exception):
@@ -810,6 +814,178 @@ def create_vscode_workspace_file(workspace_path: Path, workspace_checkout: dict)
         json.dump(content, ws_file, indent="\t")
 
 
+def load_edm_config():
+    config = None
+    if edm_config_path.exists():
+        # load config if exists
+        log.info(f"Loading edm config from {edm_config_path}")
+        with open(edm_config_path, encoding='utf-8') as edm_config_file:
+            try:
+                config = yaml.safe_load(edm_config_file)
+            except yaml.YAMLError as e:
+                log.error(f"Error parsing yaml of \"{edm_config_path}\": {e}")
+    return config
+
+
+def init_handler(args):
+    """Handler for the edm init subcommand"""
+    config_url = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete.yaml"
+
+    workspace_config = {}
+
+    if not args.config:
+        config_file_descriptor, config_path = tempfile.mkstemp(prefix="everest-complete-config")
+        log.info(f"No config file provided, downloading from {config_url} to {config_path}")
+        request = requests.get(config_url, allow_redirects=True)
+
+        with os.fdopen(config_file_descriptor, 'wb') as config_file:
+            config_file.write(request.content)
+        with open(config_path, encoding='utf-8') as config_file:
+            try:
+                workspace_config = yaml.safe_load(config_file)
+            except yaml.YAMLError as e:
+                log.error(f"Error parsing yaml of \"{config_file}\": {e}")
+
+        args.config = config_path
+
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if not args.workspace:
+        log.info(f"No workspace provided, using current working dir {working_dir}")
+        args.workspace = working_dir
+
+    EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+
+    # add workspace to list of workspaces
+    if not args.workspace_name:
+        workspace_name = args.workspace.name
+        log.info(f"No workspace name given, using parent directory name {workspace_name}")
+        args.workspace_name = workspace_name
+
+    log.info(f"Add workspace {args.workspace_name} to list of workspaces")
+
+    workspace_name = args.workspace_name.replace("[", "").replace("]", "")
+
+    # write config file
+    edm_config_dir_path.mkdir(parents=True, exist_ok=True)
+    config = load_edm_config()
+
+    if not config:
+        log.info("Config is None, creating new config")
+        config = {}
+        config["edm"] = {}  # for general workspace independent config settings
+        config["workspaces"] = {}
+
+    with open(edm_config_path, 'w', encoding='utf-8') as edm_config_file:
+        config["edm"]["active_workspace"] = workspace_name
+        config["workspaces"][workspace_name] = {}
+        config["workspaces"][workspace_name]["path"] = args.workspace.as_posix()
+        config["workspaces"][workspace_name]["config"] = workspace_config
+        yaml.dump(config, edm_config_file)
+        log.info(f"Successfully saved edm config \"{edm_config_path}\".")
+
+    modify_prompt(workspace_name=workspace_name)
+
+def modify_prompt(workspace_name):
+    """Modify prompt by execv-ing the current shell with PS1 set to custom prompt"""
+    # TODO: support for more shells, currently this only works for bash and zsh
+    current_shell = os.readlink(f"/proc/{os.getppid()}/exe")
+    if current_shell.endswith("bash") or current_shell.endswith("zsh"):
+        ps1 = subprocess.check_output([current_shell, '-i', '-c', 'echo $PS1']).decode('utf-8').replace('\n', '')
+        prefix = "[edm@"
+        if not ps1.startswith(prefix):
+            ps1 = f"{prefix}{workspace_name}] {ps1} "
+        else:
+            start = len(prefix)
+            end = ps1.find("]", start) + 1
+            ps1 = f"{prefix}{workspace_name}]{ps1[end:]}"
+            if current_shell.endswith("bash"):
+                ps1 += " "
+
+        os.environ["PS1"] = ps1
+        os.execv(current_shell, [current_shell])
+    sys.exit(0)
+
+
+def main_handler(args):
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if args.register_cmake_module:
+        log.info("Registering EDM CMake module in CMake registry")
+        install_cmake()
+
+    if args.install_bash_completion:
+        install_bash_completion()
+        sys.exit(0)
+
+    if args.git_pull is not None:
+        EDM.pull(working_dir, repos=args.git_pull)
+        sys.exit(0)
+
+    if args.git_info:
+        EDM.show_git_info(working_dir, args.workspace, args.git_fetch)
+        sys.exit(0)
+
+    if not args.config and not args.cmake and not args.create_config and not args.create_snapshot:
+        if args.update:
+            if not args.workspace:
+                args.workspace = Path(".").expanduser().resolve()
+                log.info(f"No workspace provided, using current directory "
+                         f"\"{args.workspace}\"")
+            config_path = Path(args.workspace) / "workspace-config.yaml"
+            args.config = config_path.expanduser().resolve()
+            log.info(f"No config provided, using \"{args.config}\"")
+        else:
+            log.info("No --config, --cmake or --create-config parameter given, exiting.")
+            sys.exit(0)
+
+    if args.config:
+        if not args.workspace:
+            log.error("A workspace path must be provided if supplying a config. Stopping.")
+            sys.exit(1)
+
+        EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+        sys.exit(0)
+
+    if args.create_snapshot:
+        log.info(f"Creating snapshot: {args.create_snapshot}")
+        snapshot = EDM.create_snapshot(working_dir)
+        EDM.write_config(snapshot, args.create_snapshot)
+        sys.exit(0)
+
+    if not args.cmake and not args.create_config:
+        log.error("FIXME")
+        sys.exit(1)
+
+    out_file = Path(args.out).expanduser().resolve()
+
+    workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
+    if len(workspace_files) > 1:
+        log.error(
+            f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
+        sys.exit(1)
+
+    dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
+
+    if args.create_config:
+        log.info("Creating config")
+        new_config = EDM.config_from_dependencies(dependencies, args.external_in_config, args.include_remotes)
+        new_config = EDM.create_config(working_dir, new_config, args.external_in_config, args.include_remotes)
+        EDM.write_config(new_config, args.create_config)
+        sys.exit(0)
+
+    if not args.cmake:
+        log.error("Calling the dependency manager without the --config parameter indicates usage from a CMake script. "
+                  "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
+        sys.exit(1)
+
+    workspace = EDM.parse_workspace_files(workspace_files)
+    checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
+    log.error(f"checkout: {checkout}, \n\ndeps: {dependencies}")
+    # TODO: print the dependencies that were not checked out here be comparing checkout and dependencies
+    EDM.write_cmake(workspace, checkout, dependencies, out_file)
+
+
 def get_parser(version) -> argparse.ArgumentParser:
     """Return the argument parser containign all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
@@ -887,6 +1063,25 @@ def get_parser(version) -> argparse.ArgumentParser:
     # parser.add_argument("--interactive", action='store_true',
     #                     help="Interactively ask which repositories should be checked out.")
 
+    subparsers = parser.add_subparsers(help='available commands', required=False)
+
+    init_parser = subparsers.add_parser('init', add_help=True)
+    init_parser.add_argument(
+        "--config", metavar='CONFIG',
+        help="Path to a config file that contains the repositories that should be checked out into the workspace.",
+        required=False)
+    init_parser.add_argument(
+        "--workspace", metavar='WORKSPACE',
+        help="Directory in which source code repositories that are explicity requested are checked out.",
+        required=False)
+    init_parser.add_argument(
+        "workspace_name",
+        help="Name of this workspace",
+        nargs="?")
+    init_parser.set_defaults(action_handler=init_handler)
+
+    parser.set_defaults(action_handler=main_handler)
+
     return parser
 
 
@@ -912,81 +1107,7 @@ def main(parser: argparse.ArgumentParser):
 
     setup_logging(args.verbose, args.nocolor)
 
-    working_dir = Path(args.working_dir).expanduser().resolve()
-
     if not os.environ.get("CPM_SOURCE_CACHE"):
         log.warning("CPM_SOURCE_CACHE environment variable is not set, this might lead to unintended behavior.")
 
-    if args.register_cmake_module:
-        log.info("Registering EDM CMake module in CMake registry")
-        install_cmake()
-
-    if args.install_bash_completion:
-        install_bash_completion()
-        sys.exit(0)
-
-    if args.git_pull is not None:
-        EDM.pull(working_dir, repos=args.git_pull)
-        sys.exit(0)
-
-    if args.git_info:
-        EDM.show_git_info(working_dir, args.workspace, args.git_fetch)
-        sys.exit(0)
-
-    if not args.config and not args.cmake and not args.create_config and not args.create_snapshot:
-        if args.update:
-            if not args.workspace:
-                args.workspace = Path(".").expanduser().resolve()
-                log.info(f"No workspace provided, using current directory "
-                         f"\"{args.workspace}\"")
-            config_path = Path(args.workspace) / "workspace-config.yaml"
-            args.config = config_path.expanduser().resolve()
-            log.info(f"No config provided, using \"{args.config}\"")
-        else:
-            log.info("No --config, --cmake or --create-config parameter given, exiting.")
-            sys.exit(0)
-
-    if args.config:
-        if not args.workspace:
-            log.error("A workspace path must be provided if supplying a config. Stopping.")
-            sys.exit(1)
-
-        EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
-        sys.exit(0)
-
-    if args.create_snapshot:
-        log.info(f"Creating snapshot: {args.create_snapshot}")
-        snapshot = EDM.create_snapshot(working_dir)
-        EDM.write_config(snapshot, args.create_snapshot)
-        sys.exit(0)
-
-    if not args.cmake and not args.create_config:
-        log.error("FIXME")
-        sys.exit(1)
-
-    out_file = Path(args.out).expanduser().resolve()
-
-    workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
-    if len(workspace_files) > 1:
-        log.error(
-            f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
-        sys.exit(1)
-
-    dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
-
-    if args.create_config:
-        log.info("Creating config")
-        new_config = EDM.config_from_dependencies(dependencies, args.external_in_config, args.include_remotes)
-        new_config = EDM.create_config(working_dir, new_config, args.external_in_config, args.include_remotes)
-        EDM.write_config(new_config, args.create_config)
-        sys.exit(0)
-
-    if not args.cmake:
-        log.error("Calling the dependency manager without the --config parameter indicates usage from a CMake script. "
-                  "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
-        sys.exit(1)
-
-    workspace = EDM.parse_workspace_files(workspace_files)
-    checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
-    EDM.write_cmake(workspace, checkout, dependencies, out_file)
-
+    args.action_handler(args)
