@@ -1056,7 +1056,7 @@ def main_handler(args):
 
 
 def get_parser(version) -> argparse.ArgumentParser:
-    """Return the argument parser containign all command line options."""
+    """Return the argument parser containing all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
     parser.add_argument('--version', action='version', version=f'%(prog)s {version}')
