@@ -849,7 +849,9 @@ def init_handler(args):
 
     if not args.config:
         if not EDM.check_github_key():
+            log.warning("Could not find a SSH key associated with your github account")
             log.warning("Did you add your SSH key on GitHub and made it available to ssh-agent?")
+            log.info("Using the readonly EVerest workspace config over HTTPS.")
             config_url = config_url_readonly
         config_file_descriptor, config_path = tempfile.mkstemp(prefix="everest-complete-config")
         log.info(f"No config file provided, downloading from {config_url} to {config_path}")
