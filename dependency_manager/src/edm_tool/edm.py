@@ -945,6 +945,29 @@ def cd_handler(args):
     modify_prompt(args.workspace_name)
 
 
+def rm_handler(args):
+    """Handler for the edm cd subcommand"""
+    config = load_edm_config()
+
+    if not config:
+        log.error("No edm config found")
+        sys.exit(0)
+
+    workspace_name = args.workspace_name[0]
+
+    if workspace_name in config["workspaces"]:
+        log.info(f"Removing workspace {workspace_name} from config.")
+        del config["workspaces"][workspace_name]
+
+        # write config
+        with open(edm_config_path, 'w', encoding='utf-8') as edm_config_file:
+            config["edm"]["active_workspace"] = None
+            yaml.dump(config, edm_config_file)
+            log.info(f"Successfully saved edm config \"{edm_config_path}\".")
+
+    modify_prompt(None)
+
+
 def modify_prompt(workspace_name):
     """Modify prompt by execv-ing the current shell with PS1 set to custom prompt"""
     # TODO: support for more shells, currently this only works for bash and zsh
@@ -953,11 +976,16 @@ def modify_prompt(workspace_name):
         ps1 = subprocess.check_output([current_shell, '-i', '-c', 'echo $PS1']).decode('utf-8').replace('\n', '')
         prefix = "[edm@"
         if not ps1.startswith(prefix):
-            ps1 = f"{prefix}{workspace_name}] {ps1} "
+            if workspace_name:
+                ps1 = f"{prefix}{workspace_name}] {ps1} "
         else:
             start = len(prefix)
             end = ps1.find("]", start) + 1
-            ps1 = f"{prefix}{workspace_name}]{ps1[end:]}"
+            if workspace_name:
+                ps1 = f"{prefix}{workspace_name}]{ps1[end:]}"
+            else:
+                end += 1
+                ps1 = f"{ps1[end:]}"
             if current_shell.endswith("bash"):
                 ps1 += " "
 
@@ -1231,6 +1259,13 @@ def get_parser(version) -> argparse.ArgumentParser:
         "workspace_name",
         help="Name of the workspace to change into",
         nargs="?")
+
+    rm_parser = subparsers.add_parser('rm', add_help=True)
+    rm_parser.set_defaults(action_handler=rm_handler)
+    rm_parser.add_argument(
+        "workspace_name",
+        help="Name of the workspace to remove",
+        nargs=1)
 
     git_parser = subparsers.add_parser('git', add_help=True)
     git_subparsers = git_parser.add_subparsers(help='available git commands', required=False)
