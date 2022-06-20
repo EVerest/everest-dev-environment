@@ -7,6 +7,7 @@
 import argparse
 import logging
 import json
+from typing import Tuple
 from jinja2 import Environment, FileSystemLoader
 import yaml
 import os
@@ -1006,6 +1007,46 @@ def snapshot_handler(args):
     sys.exit(0)
 
 
+def get_cmake_info_from_workspace_config(working_dir: Path) -> Tuple[dict, dict]:
+    working_dir_str = working_dir.as_posix()
+
+    # find out if current working dir is part of a workspace
+    config = load_edm_config()
+
+    if not config:
+        log.error("No edm config found")
+        return (None, None)
+
+    used_workspace = None
+    for _workspace_name, workspace in config["workspaces"].items():
+        if working_dir_str.startswith(workspace["path"]):
+            for repo_name in workspace["config"]:
+                repo_path = workspace["path"] + "/" + repo_name
+                if repo_path == working_dir_str:
+                    used_workspace = workspace
+                    break
+
+    if used_workspace:
+        log.info(f"Workspace found: {used_workspace['path']}")
+
+        workspace_config = {}
+        workspace_config["workspace"] = used_workspace["path"]
+        workspace_config["local_dependencies"] = {}
+        checkout = []
+        for name, workspace_entry in used_workspace["config"].items():
+            workspace_config_entry = {}
+            workspace_config_entry["git_tag"] = workspace_entry["git_tag"]
+            workspace_config["local_dependencies"][name] = workspace_config_entry
+            checkout_entry = {}
+            checkout_entry["name"] = name
+            checkout_entry["path"] = Path(used_workspace["path"]) / name
+            checkout_entry["git_tag"] = workspace_entry["git_tag"]
+            checkout.append(checkout_entry)
+
+        return (workspace_config, checkout)
+    return (None, None)
+
+
 def main_handler(args):
     working_dir = Path(args.working_dir).expanduser().resolve()
 
@@ -1058,12 +1099,6 @@ def main_handler(args):
 
     out_file = Path(args.out).expanduser().resolve()
 
-    workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
-    if len(workspace_files) > 1:
-        log.error(
-            f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
-        sys.exit(1)
-
     dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
 
     if args.create_config:
@@ -1078,10 +1113,18 @@ def main_handler(args):
                   "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
         sys.exit(1)
 
-    workspace = EDM.parse_workspace_files(workspace_files)
-    checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
-    log.error(f"checkout: {checkout}, \n\ndeps: {dependencies}")
-    # TODO: print the dependencies that were not checked out here be comparing checkout and dependencies
+    workspace, checkout = get_cmake_info_from_workspace_config(working_dir)
+
+    if workspace is None or checkout is None:
+        log.warning(f"Using workspace.yaml based workspace discovery, please convert your workspace with edm init.")
+        workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
+        if len(workspace_files) > 1:
+            log.error(
+                f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
+            sys.exit(1)
+
+        workspace = EDM.parse_workspace_files(workspace_files)
+        checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
     EDM.write_cmake(workspace, checkout, dependencies, out_file)
 
 
