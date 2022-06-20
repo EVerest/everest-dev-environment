@@ -682,6 +682,19 @@ class EDM:
             log.info(f"Saving dependencies in: {out_file}")
             out.write(render)
 
+    @classmethod
+    def check_github_key(cls) -> bool:
+        """Checks if a public key is stored at github."""
+        valid = False
+        try:
+            subprocess.run(["ssh", "-T", "git@github.com"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        except subprocess.CalledProcessError as process_error:
+            if process_error.returncode == 1:
+                valid = True
+
+        return valid
+
 
 def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, checkout_dir: Path, keep_branch=False) -> dict:
     """
@@ -830,10 +843,14 @@ def load_edm_config():
 def init_handler(args):
     """Handler for the edm init subcommand"""
     config_url = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete.yaml"
+    config_url_readonly = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete-readonly.yaml"
 
     workspace_config = {}
 
     if not args.config:
+        if not EDM.check_github_key():
+            log.warning("Did you add your SSH key on GitHub and made it available to ssh-agent?")
+            config_url = config_url_readonly
         config_file_descriptor, config_path = tempfile.mkstemp(prefix="everest-complete-config")
         log.info(f"No config file provided, downloading from {config_url} to {config_path}")
         request = requests.get(config_url, allow_redirects=True)
