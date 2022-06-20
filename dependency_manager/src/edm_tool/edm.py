@@ -427,7 +427,7 @@ class EDM:
             log.info(f"Did not copy workspace config because source and destination are the same \"{config_path}\"")
 
         if create_vscode_workspace:
-            create_vscode_workspace(workspace_dir, workspace_checkout)
+            create_vscode_workspace_file(workspace_dir, workspace_checkout)
 
     @classmethod
     def config_from_dependencies(cls, dependencies: dict, external_in_config: bool, include_remotes: list) -> dict:
@@ -727,7 +727,7 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
     return workspace_checkout
 
 
-def create_vscode_workspace(workspace_path: Path, workspace_checkout: dict):
+def create_vscode_workspace_file(workspace_path: Path, workspace_checkout: dict):
     """Create a VS Code compatible workspace file at the given workspace_path."""
     vscode_workspace_file_path = workspace_path / f"{workspace_path.name}.code-workspace"
 
