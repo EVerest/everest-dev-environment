@@ -975,6 +975,17 @@ def git_pull_handler(args):
         EDM.pull(working_dir, repos=args.repo_name)
 
 
+def snapshot_handler(args):
+    """Handler for the edm snapshot subcommand"""
+    log.info("EDM snapshot")
+
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    log.info(f"Creating snapshot: {args.snapshot_name}")
+    snapshot = EDM.create_snapshot(working_dir)
+    EDM.write_config(snapshot, args.snapshot_name)
+    sys.exit(0)
+
 
 def main_handler(args):
     working_dir = Path(args.working_dir).expanduser().resolve()
@@ -1175,6 +1186,14 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Name of the repo(s) to pull",
         nargs="*")
     git_pull_parser.set_defaults(action_handler=git_pull_handler)
+
+    snapshot_parser = subparsers.add_parser('snapshot', add_help=True)
+    snapshot_parser.set_defaults(action_handler=snapshot_handler)
+    snapshot_parser.add_argument(
+        "snapshot_name",
+        help="Name of the snapshot file",
+        nargs="?",
+        default="snapshot.yaml")
 
     parser.set_defaults(action_handler=main_handler)
 
