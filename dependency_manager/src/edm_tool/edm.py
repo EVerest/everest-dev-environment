@@ -320,6 +320,29 @@ class GitInfo:
         return rev
 
     @classmethod
+    def is_tag(cls, remote: str, tag: str) -> bool:
+        """Return True if the given tag can be found on the given remote."""
+        try:
+            subprocess.run(["git", "ls-remote", "--exit-code", remote, f"refs/tags/{tag}"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            return True
+        except subprocess.CalledProcessError as called_process_error:
+            if called_process_error.returncode == 2:
+                return False
+        return True
+
+    @classmethod
+    def get_rev(cls, remote: str, branch: str) -> str:
+        """Return the rev of the given branch on the given remote or the branch name on error."""
+        try:
+            result = subprocess.run(["git", "ls-remote", "--exit-code", remote, branch],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            rev = result.stdout.decode("utf-8").replace("\n", "")
+            return rev.split()[0]
+        except subprocess.CalledProcessError as called_process_error:
+            return branch
+
+    @classmethod
     def get_git_repo_info(cls, repo_path: Path, fetch=False) -> dict:
         """
         Return useful information about a repository a the given path.
@@ -1154,6 +1177,14 @@ def main_handler(args):
 
         workspace = EDM.parse_workspace_files(workspace_files)
         checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
+
+    known_branches = ["main", "master"]
+    for name, dependency in dependencies.items():
+        for checkout_dep in checkout:
+            if checkout_dep["name"] == name:
+                continue
+        if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
+            dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
     EDM.write_cmake(workspace, checkout, dependencies, out_file)
 
 
