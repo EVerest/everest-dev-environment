@@ -832,7 +832,7 @@ def load_edm_config():
     config = None
     if edm_config_path.exists():
         # load config if exists
-        log.info(f"Loading edm config from {edm_config_path}")
+        log.debug(f"Loading edm config from {edm_config_path}")
         with open(edm_config_path, encoding='utf-8') as edm_config_file:
             try:
                 config = yaml.safe_load(edm_config_file)
@@ -904,7 +904,8 @@ def init_handler(args):
         yaml.dump(config, edm_config_file)
         log.info(f"Successfully saved edm config \"{edm_config_path}\".")
 
-    modify_prompt(workspace_name=workspace_name)
+    if "modify_prompt_on_init" in config["edm"] and config["edm"]["modify_prompt_on_init"]:
+        modify_prompt(workspace_name=workspace_name)
 
 
 def list_handler(args):
