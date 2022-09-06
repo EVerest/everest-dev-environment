@@ -1095,7 +1095,7 @@ def main_handler(args):
     workspace, checkout = get_cmake_info_from_workspace_config(working_dir)
 
     if workspace is None or checkout is None:
-        log.warning("Using workspace.yaml based workspace discovery, please convert your workspace with edm init.")
+        log.debug("Using workspace.yaml based workspace discovery, please convert your workspace with edm init.")
         workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
         if len(workspace_files) > 1:
             log.error(
