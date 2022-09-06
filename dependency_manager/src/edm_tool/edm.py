@@ -7,6 +7,7 @@
 import argparse
 import logging
 import json
+from typing import Tuple
 from jinja2 import Environment, FileSystemLoader
 import yaml
 import os
@@ -14,25 +15,17 @@ from pathlib import Path, PurePath
 import subprocess
 import sys
 import shutil
+import requests
+import tempfile
 
 
 log = logging.getLogger("edm")
+edm_config_dir_path = Path("~/.config/everest").expanduser().resolve()
+edm_config_path = edm_config_dir_path / "edm.yaml"
 
 
 class LocalDependencyCheckoutError(Exception):
     """Exception thrown when a dependency could not be checked out."""
-
-
-def install_cmake():
-    """Install required CMake modules into the users cmake packages path."""
-    cmake_package_registry_path = Path.home() / ".cmake" / "packages" / "EDM"
-    cmake_package_registry_path.mkdir(parents=True, exist_ok=True)
-    edm_package_registry_file_path = cmake_package_registry_path / "edm"
-    cmake_files_path = Path(__file__).parent / "cmake"
-    log.debug(f"Storing EDM CMake path \"{cmake_files_path}\" "
-              f"in CMake package registry \"{edm_package_registry_file_path}\".")
-    with open(edm_package_registry_file_path, 'w', encoding='utf-8') as edm_package_registry_file:
-        edm_package_registry_file.write(f"{cmake_files_path}")
 
 
 def install_bash_completion(path=Path("~/.local/share/bash-completion")):
@@ -290,7 +283,7 @@ class GitInfo:
 
     @classmethod
     def get_remote_branch(cls, path: Path) -> str:
-        """Return. the remote of the current branch of the repo at path, or an empty str."""
+        """Return the remote of the current branch of the repo at path, or an empty str."""
         remote_branch = ""
         try:
             result = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
@@ -300,6 +293,65 @@ class GitInfo:
             return remote_branch
 
         return remote_branch
+
+    @classmethod
+    def get_current_rev(cls, path: Path) -> str:
+        """Return the currently checked out ref of the repo at path, or an empty str."""
+        rev = ""
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-parse", "HEAD"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            rev = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return rev
+
+        return rev
+
+    @classmethod
+    def is_tag(cls, remote: str, tag: str) -> bool:
+        """Return True if the given tag can be found on the given remote."""
+        try:
+            subprocess.run(["git", "ls-remote", "--exit-code", remote, f"refs/tags/{tag}"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            return True
+        except subprocess.CalledProcessError as called_process_error:
+            if called_process_error.returncode == 2:
+                return False
+        return True
+
+    @classmethod
+    def get_rev(cls, remote: str, branch: str) -> str:
+        """Return the rev of the given branch on the given remote or the branch name on error."""
+        try:
+            result = subprocess.run(["git", "ls-remote", "--exit-code", remote, branch],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            rev = result.stdout.decode("utf-8").replace("\n", "")
+            return rev.split()[0]
+        except subprocess.CalledProcessError:
+            return branch
+
+    @classmethod
+    def get_git_repo_info(cls, repo_path: Path, fetch=False) -> dict:
+        """
+        Return useful information about a repository a the given path.
+
+        TODO: return type should be a well defined object
+        Returns an empty dictionary if the path is no git repo
+        """
+        repo_info = {'is_repo': False}
+        if GitInfo.is_repo(repo_path):
+            repo_info["is_repo"] = True
+            if fetch:
+                repo_info["fetch_worked"] = GitInfo.fetch(repo_path)
+            repo_info["remote_branch"] = GitInfo.get_remote_branch(repo_path)
+            repo_info["behind"] = GitInfo.get_behind(repo_path)
+            repo_info["ahead"] = GitInfo.get_ahead(repo_path)
+            repo_info["tag"] = GitInfo.get_tag(repo_path)
+            repo_info["branch"] = GitInfo.get_branch(repo_path)
+            repo_info["dirty"] = GitInfo.is_dirty(repo_path)
+            repo_info["detached"] = GitInfo.is_detached(repo_path)
+            repo_info["rev"] = GitInfo.get_current_rev(repo_path)
+        return repo_info
 
     @classmethod
     def get_git_info(cls, path: Path, fetch=False) -> dict:
@@ -313,18 +365,7 @@ class GitInfo:
         subdirs = list(path.glob("*/"))
         for subdir in subdirs:
             subdir_path = Path(subdir)
-            repo_info = {'is_repo': False}
-            if GitInfo.is_repo(subdir_path):
-                repo_info["is_repo"] = True
-                if fetch:
-                    repo_info["fetch_worked"] = GitInfo.fetch(subdir_path)
-                repo_info["remote_branch"] = GitInfo.get_remote_branch(subdir_path)
-                repo_info["behind"] = GitInfo.get_behind(subdir_path)
-                repo_info["ahead"] = GitInfo.get_ahead(subdir_path)
-                repo_info["tag"] = GitInfo.get_tag(subdir_path)
-                repo_info["branch"] = GitInfo.get_branch(subdir_path)
-                repo_info["dirty"] = GitInfo.is_dirty(subdir_path)
-                repo_info["detached"] = GitInfo.is_detached(subdir_path)
+            repo_info = GitInfo.get_git_repo_info(subdir_path, fetch)
 
             git_info[subdir] = repo_info
         return git_info
@@ -347,22 +388,22 @@ class GitInfo:
             git_info[subdir] = pull_info
         return git_info
 
+    @classmethod
+    def checkout_rev(cls, checkout_dir: Path, rev: str):
+        """Check out the given rev in the given checkout_dir"""
+        try:
+            result = subprocess.run(["git", "-C", checkout_dir, "checkout", rev],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            pretty_print_process(result, 4)
+        except subprocess.CalledProcessError as result:
+            pretty_print_process(result, 4)
+
 
 class EDM:
     """Provide dependecy management functionality."""
 
     @classmethod
-    def show_git_info(cls, working_dir: Path, workspace: str, git_fetch: bool):
-        """Log information about git repositories."""
-        git_info_working_dir = working_dir
-        if workspace:
-            git_info_working_dir = Path(workspace).expanduser().resolve()
-            log.info("Workspace provided, executing git-info in workspace")
-        log.info(f"Git info for \"{git_info_working_dir}\":")
-        if git_fetch:
-            log.info("Using git-fetch to update remote information. This might take a few seconds.")
-        git_info = GitInfo.get_git_info(git_info_working_dir, git_fetch)
-
+    def print_git_info(cls, git_info):
         dirty_count = 0
         repo_count = 0
         for path, info in git_info.items():
@@ -378,7 +419,7 @@ class EDM:
 
             remote_info = ""
             if info["detached"]:
-                remote_info = f" [{Color.YELLOW}detached HEAD{Color.CLEAR}]"
+                remote_info = f" [{Color.YELLOW}detached HEAD @ {info['rev']}{Color.CLEAR}]"
             else:
                 if "branch" in info and "remote_branch" in info:
                     remote_info = (f" [remote: {Color.RED}{info['remote_branch']}{Color.CLEAR}]")
@@ -400,6 +441,19 @@ class EDM:
 
         if dirty_count > 0:
             log.info(f"{dirty_count}/{repo_count} repositories are dirty.")
+
+    @classmethod
+    def show_git_info(cls, working_dir: Path, workspace: str, git_fetch: bool):
+        """Log information about git repositories."""
+        git_info_working_dir = working_dir
+        if workspace:
+            git_info_working_dir = Path(workspace).expanduser().resolve()
+            log.info("Workspace provided, executing git-info in workspace")
+        log.info(f"Git info for \"{git_info_working_dir}\":")
+        if git_fetch:
+            log.info("Using git-fetch to update remote information. This might take a few seconds.")
+        git_info = GitInfo.get_git_info(git_info_working_dir, git_fetch)
+        EDM.print_git_info(git_info)
 
     @classmethod
     def setup_workspace_from_config(cls, workspace: str, config: str, update: bool, create_vscode_workspace: bool):
@@ -496,6 +550,21 @@ class EDM:
             new_config[name] = entry
 
         return new_config
+
+    @classmethod
+    def create_snapshot(cls, working_dir: Path) -> dict:
+        git_info = GitInfo.get_git_info(working_dir, False)
+
+        config = parse_config(working_dir / "workspace-config.yaml")
+        for path, info in git_info.items():
+            if not info["is_repo"]:
+                log.debug(f"{path.name} is not a repo, path: {path}")
+                continue
+            if path.name not in config:
+                config[path.name] = {}
+                config[path.name]["git"] = info["git"]
+            config[path.name]["git_rev"] = info["rev"]
+        return config
 
     @classmethod
     def write_config(cls, new_config: dict, out_path: str):
@@ -599,7 +668,8 @@ class EDM:
                     git_tag = dependencies[name]["git_tag"]
                 if entry is not None and "git_tag" in entry:
                     git_tag = entry["git_tag"]
-                checkout.append(checkout_local_dependency(name, dependencies[name]["git"], git_tag, checkout_dir, True))
+                checkout.append(checkout_local_dependency(
+                    name, dependencies[name]["git"], git_tag, None, checkout_dir, True))
 
         return checkout
 
@@ -623,8 +693,21 @@ class EDM:
             log.info(f"Saving dependencies in: {out_file}")
             out.write(render)
 
+    @classmethod
+    def check_github_key(cls) -> bool:
+        """Checks if a public key is stored at github."""
+        valid = False
+        try:
+            subprocess.run(["ssh", "-T", "git@github.com"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        except subprocess.CalledProcessError as process_error:
+            if process_error.returncode == 1:
+                valid = True
 
-def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: Path, keep_branch=False) -> dict:
+        return valid
+
+
+def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, checkout_dir: Path, keep_branch=False) -> dict:
     """
     Clone local dependency into checkout_dir.
 
@@ -650,6 +733,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
     log.info(f"Setting up dependency \"{Color.GREEN}{name}{Color.CLEAR}\" in workspace")
     log.debug(f"  git-remote: \"{git}\"")
     log.debug(f"  git-tag: \"{git_tag}\"")
+    log.debug(f"  git-rev: \"{git_rev}\"")
     log.debug(f"  local directory: \"{checkout_dir}\"")
     if checkout_dir.exists():
         log.debug(f"    ... the directory for dependency \"{name}\" already exists at \"{checkout_dir}\".")
@@ -662,14 +746,13 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, checkout_dir: P
             # if the repo is clean we can safely switch branches
             if git_tag is not None:
                 log.debug(f"    Repo is not dirty, checking out requested git tag \"{git_tag}\"")
-                try:
-                    result = subprocess.run(["git", "-C", checkout_dir, "checkout", git_tag],
-                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                    pretty_print_process(result, 4)
-                except subprocess.CalledProcessError as result:
-                    pretty_print_process(result, 4)
+                GitInfo.checkout_rev(checkout_dir, git_tag)
     else:
         clone_dependency_repo(git, git_tag, checkout_dir)
+
+    if git_rev is not None:
+        log.debug(f"    Checking out requested git rev \"{git_rev}\"")
+        GitInfo.checkout_rev(checkout_dir, git_rev)
 
     return {"name": name, "path": checkout_dir, "git_tag": git_tag}
 
@@ -694,9 +777,13 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
     for name, entry in config.items():
         checkout_dir = workspace_path / name
         git_tag = None
-        if entry is not None and "git_tag" in entry:
-            git_tag = entry["git_tag"]
-        workspace_checkout.append(checkout_local_dependency(name, entry["git"], git_tag, checkout_dir))
+        git_rev = None
+        if entry is not None:
+            if "git_tag" in entry:
+                git_tag = entry["git_tag"]
+            if "git_rev" in entry:
+                git_rev = entry["git_rev"]
+        workspace_checkout.append(checkout_local_dependency(name, entry["git"], git_tag, git_rev, checkout_dir))
 
     if len(workspace_checkout) > 0:
         log.info("Creating a workspace.yaml in each dependency directory, "
@@ -751,8 +838,285 @@ def create_vscode_workspace_file(workspace_path: Path, workspace_checkout: dict)
         json.dump(content, ws_file, indent="\t")
 
 
+def load_edm_config():
+    config = None
+    if edm_config_path.exists():
+        # load config if exists
+        log.debug(f"Loading edm config from {edm_config_path}")
+        with open(edm_config_path, encoding='utf-8') as edm_config_file:
+            try:
+                config = yaml.safe_load(edm_config_file)
+            except yaml.YAMLError as e:
+                log.error(f"Error parsing yaml of \"{edm_config_path}\": {e}")
+    return config
+
+
+def init_handler(args):
+    """Handler for the edm init subcommand"""
+    config_url = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete.yaml"
+    config_url_readonly = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete-readonly.yaml"
+
+    workspace_config = {}
+
+    if not args.config:
+        if not EDM.check_github_key():
+            log.warning("Could not find a SSH key associated with your github account")
+            log.warning("Did you add your SSH key on GitHub and made it available to ssh-agent?")
+            log.info("Using the readonly EVerest workspace config over HTTPS.")
+            config_url = config_url_readonly
+        config_file_descriptor, config_path = tempfile.mkstemp(prefix="everest-complete-config")
+        log.info(f"No config file provided, downloading from {config_url} to {config_path}")
+        request = requests.get(config_url, allow_redirects=True)
+
+        with os.fdopen(config_file_descriptor, 'wb') as config_file:
+            config_file.write(request.content)
+        with open(config_path, encoding='utf-8') as config_file:
+            try:
+                workspace_config = yaml.safe_load(config_file)
+            except yaml.YAMLError as e:
+                log.error(f"Error parsing yaml of \"{config_file}\": {e}")
+
+        args.config = config_path
+
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if not args.workspace:
+        log.info(f"No workspace provided, using current working dir {working_dir}")
+        args.workspace = working_dir
+
+    EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+
+    # add workspace to list of workspaces
+    if not args.workspace_name:
+        workspace_name = args.workspace.name
+        log.info(f"No workspace name given, using parent directory name {workspace_name}")
+        args.workspace_name = workspace_name
+
+    log.info(f"Add workspace {args.workspace_name} to list of workspaces")
+
+    workspace_name = args.workspace_name.replace("[", "").replace("]", "")
+
+    # write config file
+    edm_config_dir_path.mkdir(parents=True, exist_ok=True)
+    config = load_edm_config()
+
+    if not config:
+        log.info("Config is None, creating new config")
+        config = {}
+        config["edm"] = {}  # for general workspace independent config settings
+        config["workspaces"] = {}
+
+    with open(edm_config_path, 'w', encoding='utf-8') as edm_config_file:
+        config["edm"]["active_workspace"] = workspace_name
+        config["workspaces"][workspace_name] = {}
+        config["workspaces"][workspace_name]["path"] = args.workspace.as_posix()
+        config["workspaces"][workspace_name]["config"] = workspace_config
+        yaml.dump(config, edm_config_file)
+        log.info(f"Successfully saved edm config \"{edm_config_path}\".")
+
+
+def list_handler(_args):
+    """Handler for the edm list subcommand"""
+    log.info("Listing workspaces")
+    config = load_edm_config()
+
+    if not config:
+        log.info("No edm config found")
+        sys.exit(0)
+
+    for workspace_name, workspace_config in config["workspaces"].items():
+        log.info(f"  {workspace_name} ({workspace_config['path']})")
+
+
+def rm_handler(args):
+    """Handler for the edm rm subcommand"""
+    config = load_edm_config()
+
+    if not config:
+        log.error("No edm config found")
+        sys.exit(0)
+
+    workspace_name = args.workspace_name[0]
+
+    if workspace_name in config["workspaces"]:
+        log.info(f"Removing workspace {workspace_name} from config.")
+        del config["workspaces"][workspace_name]
+
+        # write config
+        with open(edm_config_path, 'w', encoding='utf-8') as edm_config_file:
+            config["edm"]["active_workspace"] = None
+            yaml.dump(config, edm_config_file)
+            log.info(f"Successfully saved edm config \"{edm_config_path}\".")
+
+
+def git_info_handler(args):
+    """Handler for the edm git info subcommand"""
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if not args.repo_name:
+        log.info("No repo name specified, listing git info for every repo in the current workspace")
+        EDM.show_git_info(working_dir, None, True)
+    else:
+        log.info(f"Only listing git info for {', '.join(args.repo_name)}")
+        git_info = {}
+        for repo_name in args.repo_name:
+            repo_path = working_dir / repo_name
+            repo_info = GitInfo.get_git_repo_info(repo_path, True)
+            git_info[repo_path] = repo_info
+        EDM.print_git_info(git_info)
+    sys.exit(0)
+
+
+def git_pull_handler(args):
+    """Handler for the edm git pull subcommand"""
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if not args.repo_name:
+        log.info("No repo name specified, pulling all repos in the current workspace")
+        EDM.pull(working_dir, repos=None)
+    else:
+        EDM.pull(working_dir, repos=args.repo_name)
+
+
+def snapshot_handler(args):
+    """Handler for the edm snapshot subcommand"""
+    log.info("EDM snapshot")
+
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    log.info(f"Creating snapshot: {args.snapshot_name}")
+    snapshot = EDM.create_snapshot(working_dir)
+    EDM.write_config(snapshot, args.snapshot_name)
+    sys.exit(0)
+
+
+def get_cmake_info_from_workspace_config(working_dir: Path) -> Tuple[dict, dict]:
+    working_dir_str = working_dir.as_posix()
+
+    # find out if current working dir is part of a workspace
+    config = load_edm_config()
+
+    if not config:
+        log.debug("No edm config found")
+        return (None, None)
+
+    used_workspace = None
+    for _workspace_name, workspace in config["workspaces"].items():
+        if working_dir_str.startswith(workspace["path"]):
+            for repo_name in workspace["config"]:
+                repo_path = workspace["path"] + "/" + repo_name
+                if repo_path == working_dir_str:
+                    used_workspace = workspace
+                    break
+
+    if used_workspace:
+        log.info(f"Workspace found: {used_workspace['path']}")
+
+        workspace_config = {}
+        workspace_config["workspace"] = used_workspace["path"]
+        workspace_config["local_dependencies"] = {}
+        checkout = []
+        for name, workspace_entry in used_workspace["config"].items():
+            workspace_config_entry = {}
+            workspace_config_entry["git_tag"] = workspace_entry["git_tag"]
+            workspace_config["local_dependencies"][name] = workspace_config_entry
+            checkout_entry = {}
+            checkout_entry["name"] = name
+            checkout_entry["path"] = Path(used_workspace["path"]) / name
+            checkout_entry["git_tag"] = workspace_entry["git_tag"]
+            checkout.append(checkout_entry)
+
+        return (workspace_config, checkout)
+    return (None, None)
+
+
+def main_handler(args):
+    working_dir = Path(args.working_dir).expanduser().resolve()
+
+    if args.install_bash_completion:
+        install_bash_completion()
+        sys.exit(0)
+
+    if args.git_pull is not None:
+        EDM.pull(working_dir, repos=args.git_pull)
+        sys.exit(0)
+
+    if args.git_info:
+        EDM.show_git_info(working_dir, args.workspace, args.git_fetch)
+        sys.exit(0)
+
+    if not args.config and not args.cmake and not args.create_config and not args.create_snapshot:
+        if args.update:
+            if not args.workspace:
+                args.workspace = Path(".").expanduser().resolve()
+                log.info(f"No workspace provided, using current directory "
+                         f"\"{args.workspace}\"")
+            config_path = Path(args.workspace) / "workspace-config.yaml"
+            args.config = config_path.expanduser().resolve()
+            log.info(f"No config provided, using \"{args.config}\"")
+        else:
+            log.info("No --config, --cmake or --create-config parameter given, exiting.")
+            sys.exit(0)
+
+    if args.config:
+        if not args.workspace:
+            log.error("A workspace path must be provided if supplying a config. Stopping.")
+            sys.exit(1)
+
+        EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+        sys.exit(0)
+
+    if args.create_snapshot:
+        log.info(f"Creating snapshot: {args.create_snapshot}")
+        snapshot = EDM.create_snapshot(working_dir)
+        EDM.write_config(snapshot, args.create_snapshot)
+        sys.exit(0)
+
+    if not args.cmake and not args.create_config:
+        log.error("FIXME")
+        sys.exit(1)
+
+    out_file = Path(args.out).expanduser().resolve()
+
+    dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
+
+    if args.create_config:
+        log.info("Creating config")
+        new_config = EDM.config_from_dependencies(dependencies, args.external_in_config, args.include_remotes)
+        new_config = EDM.create_config(working_dir, new_config, args.external_in_config, args.include_remotes)
+        EDM.write_config(new_config, args.create_config)
+        sys.exit(0)
+
+    if not args.cmake:
+        log.error("Calling the dependency manager without the --config parameter indicates usage from a CMake script. "
+                  "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
+        sys.exit(1)
+
+    workspace, checkout = get_cmake_info_from_workspace_config(working_dir)
+
+    if workspace is None or checkout is None:
+        log.debug("Using workspace.yaml based workspace discovery, please convert your workspace with edm init.")
+        workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
+        if len(workspace_files) > 1:
+            log.error(
+                f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
+            sys.exit(1)
+
+        workspace = EDM.parse_workspace_files(workspace_files)
+        checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
+
+    known_branches = ["main", "master"]
+    for name, dependency in dependencies.items():
+        for checkout_dep in checkout:
+            if checkout_dep["name"] == name:
+                continue
+        if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
+            dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
+    EDM.write_cmake(workspace, checkout, dependencies, out_file)
+
+
 def get_parser(version) -> argparse.ArgumentParser:
-    """Return the argument parser containign all command line options."""
+    """Return the argument parser containing all command line options."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="Everest Dependency Manager")
     parser.add_argument('--version', action='version', version=f'%(prog)s {version}')
@@ -789,9 +1153,6 @@ def get_parser(version) -> argparse.ArgumentParser:
         "--nocolor", action="store_true",
         help="No color output.")
     parser.add_argument(
-        "--register-cmake-module", action="store_true",
-        help="Setup the CMake registry entry for EDM.")
-    parser.add_argument(
         "--install-bash-completion", action="store_true",
         help="Install bash completion if possible.")
     parser.add_argument(
@@ -808,6 +1169,12 @@ def get_parser(version) -> argparse.ArgumentParser:
         default=["git@github.com:EVerest/*"],
         required=False)
     parser.add_argument(
+        "--create-snapshot",
+        help="Creates a config file at the given path containing all repositories from the working directory.",
+        nargs="?",
+        const="snapshot.yaml",
+        required=False)
+    parser.add_argument(
         "--git-info", action="store_true",
         help="Show information of git repositories in working_dir")
     parser.add_argument(
@@ -821,6 +1188,60 @@ def get_parser(version) -> argparse.ArgumentParser:
     # TODO(kai): consider implementing interactive mode
     # parser.add_argument("--interactive", action='store_true',
     #                     help="Interactively ask which repositories should be checked out.")
+
+    subparsers = parser.add_subparsers(help='available commands', required=False)
+
+    init_parser = subparsers.add_parser('init', add_help=True)
+    init_parser.add_argument(
+        "--config", metavar='CONFIG',
+        help="Path to a config file that contains the repositories that should be checked out into the workspace.",
+        required=False)
+    init_parser.add_argument(
+        "--workspace", metavar='WORKSPACE',
+        help="Directory in which source code repositories that are explicity requested are checked out.",
+        required=False)
+    init_parser.add_argument(
+        "workspace_name",
+        help="Name of this workspace",
+        nargs="?")
+    init_parser.set_defaults(action_handler=init_handler)
+
+    list_parser = subparsers.add_parser('list', add_help=True)
+    list_parser.set_defaults(action_handler=list_handler)
+
+    rm_parser = subparsers.add_parser('rm', add_help=True)
+    rm_parser.set_defaults(action_handler=rm_handler)
+    rm_parser.add_argument(
+        "workspace_name",
+        help="Name of the workspace to remove",
+        nargs=1)
+
+    git_parser = subparsers.add_parser('git', add_help=True)
+    git_subparsers = git_parser.add_subparsers(help='available git commands', required=False)
+
+    git_info_parser = git_subparsers.add_parser('info', add_help=True)
+    git_info_parser.add_argument(
+        "repo_name",
+        help="Name of the repo(s) to get info from",
+        nargs="*")
+    git_info_parser.set_defaults(action_handler=git_info_handler)
+
+    git_pull_parser = git_subparsers.add_parser('pull', add_help=True)
+    git_pull_parser.add_argument(
+        "repo_name",
+        help="Name of the repo(s) to pull",
+        nargs="*")
+    git_pull_parser.set_defaults(action_handler=git_pull_handler)
+
+    snapshot_parser = subparsers.add_parser('snapshot', add_help=True)
+    snapshot_parser.set_defaults(action_handler=snapshot_handler)
+    snapshot_parser.add_argument(
+        "snapshot_name",
+        help="Name of the snapshot file",
+        nargs="?",
+        default="snapshot.yaml")
+
+    parser.set_defaults(action_handler=main_handler)
 
     return parser
 
@@ -847,79 +1268,7 @@ def main(parser: argparse.ArgumentParser):
 
     setup_logging(args.verbose, args.nocolor)
 
-    working_dir = Path(args.working_dir).expanduser().resolve()
-
     if not os.environ.get("CPM_SOURCE_CACHE"):
         log.warning("CPM_SOURCE_CACHE environment variable is not set, this might lead to unintended behavior.")
 
-    if args.register_cmake_module:
-        log.info("Registering EDM CMake module in CMake registry")
-        install_cmake()
-
-    if args.install_bash_completion:
-        install_bash_completion()
-        sys.exit(0)
-
-    if args.git_pull is not None:
-        EDM.pull(working_dir, repos=args.git_pull)
-        sys.exit(0)
-
-    if args.git_info:
-        EDM.show_git_info(working_dir, args.workspace, args.git_fetch)
-        sys.exit(0)
-
-    if not args.config and not args.cmake and not args.create_config:
-        if args.update:
-            if not args.workspace:
-                args.workspace = Path(".").expanduser().resolve()
-                log.info(f"No workspace provided, using current directory "
-                         f"\"{args.workspace}\"")
-            config_path = Path(args.workspace) / "workspace-config.yaml"
-            args.config = config_path.expanduser().resolve()
-            log.info(f"No config provided, using \"{args.config}\"")
-        else:
-            log.info("No --config, --cmake or --create-config parameter given, exiting.")
-            sys.exit(0)
-
-    if args.config:
-        if not args.workspace:
-            log.error("A workspace path must be provided if supplying a config. Stopping.")
-            sys.exit(1)
-
-        EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
-        sys.exit(0)
-
-    if not args.cmake and not args.create_config:
-        log.error("FIXME")
-        sys.exit(1)
-
-    out_file = Path(args.out).expanduser().resolve()
-
-    workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
-    if len(workspace_files) > 1:
-        log.error(
-            f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
-        sys.exit(1)
-
-    dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
-
-    if args.create_config:
-        log.info("Creating config")
-        new_config = EDM.config_from_dependencies(dependencies, args.external_in_config, args.include_remotes)
-        new_config = EDM.create_config(working_dir, new_config, args.external_in_config, args.include_remotes)
-        EDM.write_config(new_config, args.create_config)
-        sys.exit(0)
-
-    if not args.cmake:
-        log.error("Calling the dependency manager without the --config parameter indicates usage from a CMake script. "
-                  "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
-        sys.exit(1)
-
-    workspace = EDM.parse_workspace_files(workspace_files)
-    checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
-    EDM.write_cmake(workspace, checkout, dependencies, out_file)
-
-
-if __name__ == "__main__":
-    parser = get_parser()
-    main(parser)
+    args.action_handler(args)
