@@ -997,7 +997,7 @@ def get_cmake_info_from_workspace_config(working_dir: Path) -> Tuple[dict, dict]
     config = load_edm_config()
 
     if not config:
-        log.error("No edm config found")
+        log.debug("No edm config found")
         return (None, None)
 
     used_workspace = None
