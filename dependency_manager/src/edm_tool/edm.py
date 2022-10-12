@@ -643,6 +643,20 @@ class EDM:
         return workspace
 
     @classmethod
+    def parse_workspace_directory(cls, workspace_dir: Path) -> dict:
+        """Parse the given workspace_dir for possible local dependencies"""
+        workspace = {}
+        workspace["local_dependencies"] = {}
+        workspace["workspace"] = workspace_dir.as_posix()
+        for entry in workspace_dir.iterdir():
+            if not entry.is_dir():
+                pass
+            workspace["local_dependencies"][entry.name] = {}
+            workspace["local_dependencies"][entry.name]["git_tag"] = GitInfo.get_branch(entry)
+
+        return workspace
+
+    @classmethod
     def checkout_local_dependencies(cls, workspace: dict, workspace_arg: str, dependencies: dict) -> list:
         """Checkout local dependencies in the workspace."""
         checkout = []
@@ -654,13 +668,13 @@ class EDM:
                 log.info(f"Using workspace directory \"{workspace_dir}\" from command line.")
             elif "workspace" in workspace:
                 workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
-                log.info(f"Using workspace directory \"{workspace_dir}\" from workspace.yaml.")
+                log.info(f"Using workspace directory \"{workspace_dir}\".")
             else:
                 print("Cannot checkout requested dependencies without a workspace directory, stopping.")
                 sys.exit(1)
             for name, entry in workspace["local_dependencies"].items():
                 if name not in dependencies:
-                    log.debug(f"{name}: listed in workspace.yaml, but not in dependencies. Ignoring.")
+                    log.debug(f"{name}: listed in workspace, but not in dependencies. Ignoring.")
                     continue
                 checkout_dir = workspace_dir / name
                 git_tag = None
@@ -785,31 +799,6 @@ def setup_workspace(workspace_path: Path, config: dict, update=False) -> dict:
                 git_rev = entry["git_rev"]
         workspace_checkout.append(checkout_local_dependency(name, entry["git"], git_tag, git_rev, checkout_dir))
 
-    if len(workspace_checkout) > 0:
-        log.info("Creating a workspace.yaml in each dependency directory, "
-                 "ensuring that each repository uses the correct local dependency.")
-    # create workspace.yaml files in these folders
-    for entry in workspace_checkout:
-        name = entry["name"]
-        workspace_yaml_file = entry["path"] / "workspace.yaml"
-        log.info(f"  {Color.GREEN}{name}{Color.CLEAR}")
-        workspace_config = {}
-        workspace_config["workspace"] = workspace_path.as_posix()
-        workspace_config["local_dependencies"] = {}
-        for workspace_entry in workspace_checkout:
-            workspace_config_entry = {}
-            workspace_config_entry["git_tag"] = workspace_entry["git_tag"]
-            workspace_config["local_dependencies"][workspace_entry["name"]] = workspace_config_entry
-        if workspace_yaml_file.exists():
-            log.warning(f"    \"{workspace_yaml_file}\" already exists.")
-            if update:
-                log.info("    Updating workspace.yaml")
-            else:
-                log.warning("    Use --update to overwrite workspace.yaml")
-                continue
-        log.debug(f"    Writing \"{workspace_yaml_file}\"")
-        with open(workspace_yaml_file, 'w', encoding='utf-8') as w:
-            yaml.dump(workspace_config, w)
     log.info("Done.")
     return workspace_checkout
 
@@ -884,7 +873,7 @@ def init_handler(args):
         log.info(f"No workspace provided, using current working dir {working_dir}")
         args.workspace = working_dir
 
-    EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+    EDM.setup_workspace_from_config(args.workspace, args.config, False, args.create_vscode_workspace)
 
     # add workspace to list of workspaces
     if not args.workspace_name:
@@ -910,7 +899,6 @@ def init_handler(args):
         config["edm"]["active_workspace"] = workspace_name
         config["workspaces"][workspace_name] = {}
         config["workspaces"][workspace_name]["path"] = args.workspace.as_posix()
-        config["workspaces"][workspace_name]["config"] = workspace_config
         yaml.dump(config, edm_config_file)
         log.info(f"Successfully saved edm config \"{edm_config_path}\".")
 
@@ -990,46 +978,6 @@ def snapshot_handler(args):
     sys.exit(0)
 
 
-def get_cmake_info_from_workspace_config(working_dir: Path) -> Tuple[dict, dict]:
-    working_dir_str = working_dir.as_posix()
-
-    # find out if current working dir is part of a workspace
-    config = load_edm_config()
-
-    if not config:
-        log.debug("No edm config found")
-        return (None, None)
-
-    used_workspace = None
-    for _workspace_name, workspace in config["workspaces"].items():
-        if working_dir_str.startswith(workspace["path"]):
-            for repo_name in workspace["config"]:
-                repo_path = workspace["path"] + "/" + repo_name
-                if repo_path == working_dir_str:
-                    used_workspace = workspace
-                    break
-
-    if used_workspace:
-        log.info(f"Workspace found: {used_workspace['path']}")
-
-        workspace_config = {}
-        workspace_config["workspace"] = used_workspace["path"]
-        workspace_config["local_dependencies"] = {}
-        checkout = []
-        for name, workspace_entry in used_workspace["config"].items():
-            workspace_config_entry = {}
-            workspace_config_entry["git_tag"] = workspace_entry["git_tag"]
-            workspace_config["local_dependencies"][name] = workspace_config_entry
-            checkout_entry = {}
-            checkout_entry["name"] = name
-            checkout_entry["path"] = Path(used_workspace["path"]) / name
-            checkout_entry["git_tag"] = workspace_entry["git_tag"]
-            checkout.append(checkout_entry)
-
-        return (workspace_config, checkout)
-    return (None, None)
-
-
 def main_handler(args):
     working_dir = Path(args.working_dir).expanduser().resolve()
 
@@ -1046,24 +994,15 @@ def main_handler(args):
         sys.exit(0)
 
     if not args.config and not args.cmake and not args.create_config and not args.create_snapshot:
-        if args.update:
-            if not args.workspace:
-                args.workspace = Path(".").expanduser().resolve()
-                log.info(f"No workspace provided, using current directory "
-                         f"\"{args.workspace}\"")
-            config_path = Path(args.workspace) / "workspace-config.yaml"
-            args.config = config_path.expanduser().resolve()
-            log.info(f"No config provided, using \"{args.config}\"")
-        else:
-            log.info("No --config, --cmake or --create-config parameter given, exiting.")
-            sys.exit(0)
+        log.info("No --config, --cmake or --create-config parameter given, exiting.")
+        sys.exit(0)
 
     if args.config:
         if not args.workspace:
             log.error("A workspace path must be provided if supplying a config. Stopping.")
             sys.exit(1)
 
-        EDM.setup_workspace_from_config(args.workspace, args.config, args.update, args.create_vscode_workspace)
+        EDM.setup_workspace_from_config(args.workspace, args.config, False, args.create_vscode_workspace)
         sys.exit(0)
 
     if args.create_snapshot:
@@ -1092,18 +1031,8 @@ def main_handler(args):
                   "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
         sys.exit(1)
 
-    workspace, checkout = get_cmake_info_from_workspace_config(working_dir)
-
-    if workspace is None or checkout is None:
-        log.debug("Using workspace.yaml based workspace discovery, please convert your workspace with edm init.")
-        workspace_files = list(working_dir.glob("workspace.yaml")) + list(working_dir.glob("workspace.yml"))
-        if len(workspace_files) > 1:
-            log.error(
-                f"There are multiple workspace files ({workspace_files}) only one file is allowed per repository!")
-            sys.exit(1)
-
-        workspace = EDM.parse_workspace_files(workspace_files)
-        checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
+    workspace = EDM.parse_workspace_directory(working_dir.parent)
+    checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
 
     known_branches = ["main", "master"]
     for name, dependency in dependencies.items():
@@ -1140,9 +1069,6 @@ def get_parser(version) -> argparse.ArgumentParser:
     parser.add_argument(
         "--create-vscode-workspace", action="store_true",
         help="Create a VS Code workspace by saving a <workspace>.code-workspace file in the workspace folder.")
-    parser.add_argument(
-        "--update", action="store_true",
-        help="Update workspace.yaml files with autogenerated ones.")
     parser.add_argument(
         "--cmake", action="store_true",
         help="Use this flag to indicate that the dependency manager was called from a CMake script.")
