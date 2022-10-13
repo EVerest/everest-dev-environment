@@ -652,7 +652,7 @@ class EDM:
             if not entry.is_dir():
                 pass
             workspace["local_dependencies"][entry.name] = {}
-            workspace["local_dependencies"][entry.name]["git_tag"] = GitInfo.get_branch(entry)
+            workspace["local_dependencies"][entry.name] = {"git_tag": GitInfo.get_branch(entry)}
 
         return workspace
 
@@ -1031,15 +1031,29 @@ def main_handler(args):
                   "If this is intendend , please use the --cmake flag to explicitly request this functionality.")
         sys.exit(1)
 
-    workspace = EDM.parse_workspace_directory(working_dir.parent)
+    env_workspace = os.environ.get('EVEREST_EDM_WORKSPACE')
+    workspace_dir = working_dir.parent
+    if env_workspace:
+        workspace_dir = Path(env_workspace).expanduser().resolve()
+        log.info(f'Using workspace path set in EVEREST_EDM_WORKSPACE environment variable: {workspace_dir}')
+    else:
+        log.info(f'Using parent directory as workspace path: {workspace_dir}')
+
+    workspace = EDM.parse_workspace_directory(workspace_dir)
     checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
 
     known_branches = ["main", "master"]
     for name, dependency in dependencies.items():
+        shortcut = False
         for checkout_dep in checkout:
             if checkout_dep["name"] == name:
-                continue
+                shortcut = True
+        if shortcut:
+            log.info(f'Dependency "{name}": available locally')
+            continue
+        log.info(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
         if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
+            log.info(f'Dependency "{name}": requesting remote rev')
             dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
     EDM.write_cmake(workspace, checkout, dependencies, out_file)
 

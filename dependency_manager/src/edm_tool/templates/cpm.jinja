@@ -1,3 +1,4 @@
+set(ENV{EVEREST_EDM_WORKSPACE} {{ workspace["workspace"] }})
 set(CPM_USE_NAMED_CACHE_DIRECTORIES ON)
 {% for dep in checkout %}
 set(CPM_{{ dep["name"] }}_SOURCE "{{ dep["path"] }}")
