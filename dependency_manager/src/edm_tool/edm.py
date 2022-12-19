@@ -553,10 +553,10 @@ class EDM:
         return new_config
 
     @classmethod
-    def create_snapshot(cls, working_dir: Path) -> dict:
+    def create_snapshot(cls, working_dir: Path, config_path: Path) -> dict:
         git_info = GitInfo.get_git_info(working_dir, False)
 
-        config = parse_config(working_dir / "workspace-config.yaml")
+        config = parse_config(config_path)
         for path, info in git_info.items():
             if not info["is_repo"]:
                 log.debug(f"{path.name} is not a repo, path: {path}")
@@ -720,6 +720,15 @@ class EDM:
                 valid = True
 
         return valid
+
+    @classmethod
+    def write_config_from_scanned_dependencies(cls, working_dir: Path, include_deps: list,
+                                               external_in_config: bool, include_remotes: list, config_path: Path):
+        """Writes a config file from the scanned dependencies in working_dir"""
+        dependencies = EDM.scan_dependencies(working_dir, include_deps)
+        new_config = EDM.config_from_dependencies(dependencies, external_in_config, include_remotes)
+        new_config = EDM.create_config(working_dir, new_config, external_in_config, include_remotes)
+        EDM.write_config(new_config, config_path)
 
 
 def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, checkout_dir: Path, keep_branch=False) -> dict:
@@ -969,13 +978,33 @@ def git_pull_handler(args):
 
 def snapshot_handler(args):
     """Handler for the edm snapshot subcommand"""
-    log.info("EDM snapshot")
-
     working_dir = Path(args.working_dir).expanduser().resolve()
 
+    config_path = working_dir / "workspace-config.yaml"
+
+    if not config_path.exists():
+        log.info(f'Workspace config does not exist, creating a new one at: {config_path}')
+        EDM.write_config_from_scanned_dependencies(
+            working_dir, args.include_deps, args.external_in_config, args.include_remotes, config_path)
+
     log.info(f"Creating snapshot: {args.snapshot_name}")
-    snapshot = EDM.create_snapshot(working_dir)
-    EDM.write_config(snapshot, args.snapshot_name)
+
+    iterations = 1
+    if args.recursive:
+        iterations = args.recursive
+    old_snapshot = dict()
+    for i in range(iterations):
+        if i > 0:
+            # only do recursive parsing if explicitly requested
+            EDM.write_config_from_scanned_dependencies(
+                working_dir, args.include_deps, args.external_in_config, args.include_remotes, config_path)
+            EDM.setup_workspace_from_config(working_dir, config_path, False, False)
+        snapshot = EDM.create_snapshot(working_dir, config_path)
+        EDM.write_config(snapshot, args.snapshot_name)
+        if snapshot == old_snapshot:
+            log.info(f'Stopping recursive snpashot generation early after {i+1} loops.')
+            break
+        old_snapshot = snapshot
     sys.exit(0)
 
 
@@ -1131,7 +1160,7 @@ def get_parser(version) -> argparse.ArgumentParser:
         "--include-remotes", metavar='INTERNAL',
         help="List of git remotes that are included in a created config file",
         nargs="*",
-        default=["git@github.com:EVerest/*"],
+        default=["git@github.com:EVerest/*", "https://github.com/EVerest/*"],
         required=False)
     parser.add_argument(
         "--create-snapshot",
@@ -1205,6 +1234,18 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Name of the snapshot file",
         nargs="?",
         default="snapshot.yaml")
+    snapshot_parser.add_argument(
+        "--recursive",
+        help="Recursively check out the snapshot",
+        nargs="?",
+        const=10,
+        required=False)
+    snapshot_parser.add_argument(
+        "--config",
+        help="Path to a snapshot config.",
+        nargs="?",
+        const="snapshot-config.yaml",
+        required=False)
 
     parser.set_defaults(action_handler=main_handler)
 
