@@ -296,6 +296,19 @@ class GitInfo:
         return remote_branch
 
     @classmethod
+    def get_remote_url(cls, path: Path) -> str:
+        """Return the remote url of the repo at path, or an empty str."""
+        remote_url = ""
+        try:
+            result = subprocess.run(["git", "-C", path, "config", "--get", "remote.origin.url"],
+                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            remote_url = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return remote_url
+
+        return remote_url
+
+    @classmethod
     def get_current_rev(cls, path: Path) -> str:
         """Return the currently checked out ref of the repo at path, or an empty str."""
         rev = ""
@@ -352,6 +365,7 @@ class GitInfo:
             repo_info["dirty"] = GitInfo.is_dirty(repo_path)
             repo_info["detached"] = GitInfo.is_detached(repo_path)
             repo_info["rev"] = GitInfo.get_current_rev(repo_path)
+            repo_info["url"] = GitInfo.get_remote_url(repo_path)
         return repo_info
 
     @classmethod
@@ -519,13 +533,9 @@ class EDM:
 
             entry = {}
 
-            try:
-                remote_result = subprocess.run(["git", "-C", subdir_path, "config", "--get", "remote.origin.url"],
-                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            except subprocess.CalledProcessError:
+            remote = GitInfo.get_remote_url(subdir_path)
+            if not remote:
                 log.warning(f"Skipping {name} because remote could not be determined.")
-                continue
-            remote = remote_result.stdout.decode("utf-8").replace("\n", "")
             log.debug(f"  remote: {remote}")
             if not external_in_config and not pattern_matches(remote, include_remotes):
                 log.debug(f"Skipping {name} because it is an external dependency.")
@@ -563,7 +573,7 @@ class EDM:
                 continue
             if path.name not in config:
                 config[path.name] = {}
-                config[path.name]["git"] = info["git"]
+                config[path.name]["git"] = info["url"]
             config[path.name]["git_rev"] = info["rev"]
         return config
 
