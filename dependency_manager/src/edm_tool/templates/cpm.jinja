@@ -4,6 +4,9 @@ set(CPM_USE_NAMED_CACHE_DIRECTORIES ON)
 set(CPM_{{ dep["name"] }}_SOURCE "{{ dep["path"] }}")
 {% endfor %}
 {% for name, value in dependencies.items() %}
+if("{{name}}" IN_LIST EVEREST_EXCLUDE_DEPENDENCIES)
+    message(STATUS "Excluding dependency {{name}}")
+else()
 {% if value and "git" in value %}
 CPMAddPackage(
     NAME {{ name }}
@@ -36,6 +39,8 @@ if({{name}}_ADDED)
   add_library({{value["alias"]["name"]}} ALIAS {{value["alias"]["target"]}})
 endif()
 {% endif %}
+endif()
+
 {% endfor %}
 
 
