@@ -575,6 +575,8 @@ class EDM:
                 config[path.name] = {}
                 config[path.name]["git"] = info["url"]
             config[path.name]["git_rev"] = info["rev"]
+            if info["tag"]:
+                config[path.name]["git_tag"] = info["tag"]
         return config
 
     @classmethod
