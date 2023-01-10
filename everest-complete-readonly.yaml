@@ -3,6 +3,11 @@ RISE-V2G:
   git_tag: master
   options:
   - THIRD_PARTY_APP_DST rise_v2g
+Josev:
+  git: https://github.com/EVerest/ext-switchev-iso15118.git
+  git_tag: everest
+  options:
+  - THIRD_PARTY_APP_DST josev
 everest-cmake:
   git: https://github.com/EVerest/everest-cmake.git
   git_tag: main
