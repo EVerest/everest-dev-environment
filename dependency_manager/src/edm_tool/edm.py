@@ -301,12 +301,29 @@ class GitInfo:
         remote_url = ""
         try:
             result = subprocess.run(["git", "-C", path, "config", "--get", "remote.origin.url"],
-                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
             remote_url = result.stdout.decode("utf-8").replace("\n", "")
         except subprocess.CalledProcessError:
             return remote_url
 
         return remote_url
+
+    @classmethod
+    def get_remote_tags(cls, remote_url: str) -> list:
+        """Return the remote tags of the repo at path, or an empty list."""
+        remote_tags = []
+        try:
+            result = subprocess.run(["git", "ls-remote", "--tags", "--sort=-v:refname", "--refs", "--quiet", remote_url],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            result_list = result.stdout.decode("utf-8").split("\n")
+            for entry in result_list:
+                ref_and_tag = entry.split("\t")
+                if len(ref_and_tag) > 1:
+                    remote_tags.append(ref_and_tag[1].replace("refs/tags/", ""))
+        except subprocess.CalledProcessError:
+            return remote_tags
+
+        return remote_tags
 
     @classmethod
     def get_current_rev(cls, path: Path) -> str:
@@ -580,14 +597,16 @@ class EDM:
         return config
 
     @classmethod
-    def write_config(cls, new_config: dict, out_path: str):
+    def write_config(cls, new_config: dict, out_path: str, silent=False):
         """Write the given config to the given path."""
         new_config_path = Path(out_path).expanduser().resolve()
         for config_entry_name, _ in new_config.items():
-            log.info(f"Adding \"{Color.GREEN}{config_entry_name}{Color.CLEAR}\" to config.")
+            if not silent:
+                log.info(f"Adding \"{Color.GREEN}{config_entry_name}{Color.CLEAR}\" to config.")
         with open(new_config_path, 'w', encoding='utf-8') as new_config_file:
             yaml.dump(new_config, new_config_file)
-            log.info(f"Successfully saved config \"{new_config_path}\".")
+            if not silent:
+                log.info(f"Successfully saved config \"{new_config_path}\".")
 
     @classmethod
     def pull(cls, working_dir: Path, repos: list):
@@ -610,11 +629,13 @@ class EDM:
             log.info(f"{pull_error_count}/{repo_count} repositories could not be pulled.")
 
     @classmethod
-    def scan_dependencies(cls, working_dir: Path, include_deps: list) -> dict:
+    def scan_dependencies(cls, working_dir: Path, include_deps: list, files_to_ignore: set = []) -> Tuple[dict, set]:
         """Scan working_dir for dependencies."""
         log.info(f"Scanning \"{working_dir}\" for dependencies.")
-        dependencies_files = list(working_dir.glob("**/dependencies.yaml")) + \
-            list(working_dir.glob("**/dependencies.yml"))
+        dependencies_files = set(list(working_dir.glob("**/dependencies.yaml")) +
+                                 list(working_dir.glob("**/dependencies.yml")))
+
+        dependencies_files.difference_update(files_to_ignore)
 
         dependencies = {}
         for dependencies_file in dependencies_files:
@@ -636,7 +657,7 @@ class EDM:
                     except yaml.YAMLError as e:
                         log.error(f"Error parsing yaml of \"{dependencies_file}\": {e}")
 
-        return dependencies
+        return (dependencies, dependencies_files)
 
     @classmethod
     def parse_workspace_files(cls, workspace_files: list) -> dict:
@@ -737,7 +758,7 @@ class EDM:
     def write_config_from_scanned_dependencies(cls, working_dir: Path, include_deps: list,
                                                external_in_config: bool, include_remotes: list, config_path: Path):
         """Writes a config file from the scanned dependencies in working_dir"""
-        dependencies = EDM.scan_dependencies(working_dir, include_deps)
+        (dependencies, _) = EDM.scan_dependencies(working_dir, include_deps)
         new_config = EDM.config_from_dependencies(dependencies, external_in_config, include_remotes)
         new_config = EDM.create_config(working_dir, new_config, external_in_config, include_remotes)
         EDM.write_config(new_config, config_path)
@@ -864,48 +885,88 @@ def load_edm_config():
 
 def init_handler(args):
     """Handler for the edm init subcommand"""
-    config_url = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete.yaml"
-    config_url_readonly = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-complete-readonly.yaml"
-
-    workspace_config = {}
-
-    if not args.config:
-        if not EDM.check_github_key():
-            log.warning("Could not find a SSH key associated with your github account")
-            log.warning("Did you add your SSH key on GitHub and made it available to ssh-agent?")
-            log.info("Using the readonly EVerest workspace config over HTTPS.")
-            config_url = config_url_readonly
-        config_file_descriptor, config_path = tempfile.mkstemp(prefix="everest-complete-config")
-        log.info(f"No config file provided, downloading from {config_url} to {config_path}")
-        request = requests.get(config_url, allow_redirects=True)
-
-        with os.fdopen(config_file_descriptor, 'wb') as config_file:
-            config_file.write(request.content)
-        with open(config_path, encoding='utf-8') as config_file:
-            try:
-                workspace_config = yaml.safe_load(config_file)
-            except yaml.YAMLError as e:
-                log.error(f"Error parsing yaml of \"{config_file}\": {e}")
-
-        args.config = config_path
-
     working_dir = Path(args.working_dir).expanduser().resolve()
 
-    if not args.workspace:
-        log.info(f"No workspace provided, using current working dir {working_dir}")
-        args.workspace = working_dir
+    config_path = working_dir / "workspace-config.yaml"
 
-    EDM.setup_workspace_from_config(args.workspace, args.config, False, args.create_vscode_workspace)
+    if args.list:
+        tags = GitInfo.get_remote_tags("https://github.com/EVerest/everest-core.git")
+        log.info(f"Available everest-core releases: {', '.join(tags)}")
+        sys.exit(0)
 
-    # add workspace to list of workspaces
-    if not args.workspace_name:
-        workspace_name = args.workspace.name
-        log.info(f"No workspace name given, using parent directory name {workspace_name}")
-        args.workspace_name = workspace_name
+    if args.release:
+        log.info(f"Checking if requested EVerest release \"{args.release}\" is available...")
+    else:
+        log.info(f"No release specified, checking for most recent stable version...")
 
-    log.info(f"Add workspace {args.workspace_name} to list of workspaces")
+    github_key_available = EDM.check_github_key()
 
-    workspace_name = args.workspace_name.replace("[", "").replace("]", "")
+    github_https_pefix = "https://github.com/EVerest/"
+    github_git_prefix = "git@github.com:EVerest/"
+
+    github_prefix = github_https_pefix
+
+    if github_key_available:
+        github_prefix = github_git_prefix
+
+    everest_core = {"name": "everest-core", "repo": github_prefix + "everest-core.git", "release": args.release}
+    everest_cmake = {"name": "everest-cmake", "repo": github_prefix + "everest-cmake.git", "release": None}
+    everest_dev_environment = {"name": "everest-dev-environment",
+                               "repo": github_prefix + "everest-dev-environment.git", "release": None}
+    everest_utils = {"name": "everest-utils", "repo": github_prefix + "everest-utils.git", "release": None}
+
+    for repo in [everest_core, everest_cmake, everest_dev_environment, everest_utils]:
+        tags = GitInfo.get_remote_tags(repo["repo"])
+        latest_tag = tags[0] if len(tags) > 0 else "main"
+
+        if repo["release"]:
+            if repo["release"] in tags:
+                latest_tag = repo["release"]
+                log.info(f"Requested release is available: {repo['release']}")
+            else:
+                log.error(f"Requested release is NOT available: {repo['release']}")
+                sys.exit(1)
+
+        log.info(f"Using \"{Color.GREEN}{repo['name']}{Color.CLEAR}\" @ {latest_tag}")
+        checkout_local_dependency(repo["name"], repo["repo"], latest_tag, None, working_dir / repo["name"], False)
+
+    # now we have the basics, get the rest recursively
+    iterations = 10
+    old_snapshot = dict()
+    config = {}
+    scanned_dependencies_files = set()
+    for i in range(iterations):
+        if i > 0:
+            # only do recursive parsing if explicitly requested
+            (dependencies, dependencies_files) = EDM.scan_dependencies(
+                working_dir, args.include_deps, scanned_dependencies_files)
+            scanned_dependencies_files.update(dependencies_files)
+            new_config = EDM.config_from_dependencies(dependencies, args.external_in_config, args.include_remotes)
+            new_config = EDM.create_config(working_dir, new_config, args.external_in_config, args.include_remotes)
+            # merge config with new_config, overwrite github https prefix with git prefix
+            for name, entry in new_config.items():
+                if name not in config:
+                    if github_key_available and "git" in entry and entry["git"].startswith(github_https_pefix):
+                        entry["git"] = entry["git"].replace(github_https_pefix, github_git_prefix, 1)
+                    config[name] = entry
+                    checkout_dir = working_dir / name
+                    git_tag = None
+                    git_rev = None
+                    if entry is not None:
+                        if "git_tag" in entry:
+                            git_tag = entry["git_tag"]
+                        if "git_rev" in entry:
+                            git_rev = entry["git_rev"]
+                    checkout_local_dependency(name, entry["git"], git_tag, git_rev, checkout_dir)
+            EDM.write_config(config, config_path, True)
+            # EDM.setup_workspace_from_config(working_dir, config_path, False, False)
+
+        snapshot = EDM.create_snapshot(working_dir, config_path)
+        if snapshot == old_snapshot:
+            log.info(f'Stopping recursive workspace setup early after {i+1} loops.')
+            break
+        old_snapshot = snapshot
+    EDM.show_git_info(working_dir, None, False)
 
     # write config file
     edm_config_dir_path.mkdir(parents=True, exist_ok=True)
@@ -918,9 +979,10 @@ def init_handler(args):
         config["workspaces"] = {}
 
     with open(edm_config_path, 'w', encoding='utf-8') as edm_config_file:
+        workspace_name = working_dir.name
         config["edm"]["active_workspace"] = workspace_name
         config["workspaces"][workspace_name] = {}
-        config["workspaces"][workspace_name]["path"] = args.workspace.as_posix()
+        config["workspaces"][workspace_name]["path"] = working_dir.as_posix()
         yaml.dump(config, edm_config_file)
         log.info(f"Successfully saved edm config \"{edm_config_path}\".")
 
@@ -1014,7 +1076,7 @@ def snapshot_handler(args):
         snapshot = EDM.create_snapshot(working_dir, config_path)
         EDM.write_config(snapshot, args.snapshot_name)
         if snapshot == old_snapshot:
-            log.info(f'Stopping recursive snpashot generation early after {i+1} loops.')
+            log.info(f'Stopping recursive snapshot generation early after {i+1} loops.')
             break
         old_snapshot = snapshot
     sys.exit(0)
@@ -1094,7 +1156,7 @@ def main_handler(args):
 
     out_file = Path(args.out).expanduser().resolve()
 
-    dependencies = EDM.scan_dependencies(working_dir, args.include_deps)
+    (dependencies, _) = EDM.scan_dependencies(working_dir, args.include_deps)
 
     if args.create_config:
         log.info("Creating config")
@@ -1207,10 +1269,14 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Directory in which source code repositories that are explicity requested are checked out.",
         required=False)
     init_parser.add_argument(
-        "workspace_name",
-        help="Name of this workspace",
+        "release",
+        help="Release version requested, if empty the most recent stable release is assumed.",
         nargs="?")
     init_parser.set_defaults(action_handler=init_handler)
+    init_parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available everest-core versions.")
 
     list_parser = subparsers.add_parser('list', add_help=True)
     list_parser.set_defaults(action_handler=list_handler)
