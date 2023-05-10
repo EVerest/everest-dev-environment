@@ -15,6 +15,7 @@ from pathlib import Path, PurePath
 import subprocess
 import sys
 import shutil
+import multiprocessing
 import requests
 import tempfile
 
@@ -978,6 +979,41 @@ def snapshot_handler(args):
     sys.exit(0)
 
 
+def check_non_local_dependecy(dependency_item):
+    name, dependency = dependency_item
+
+    known_branches = ["main", "master"]
+
+    log.info(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
+    if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
+        log.info(f'Dependency "{name}": requesting remote rev')
+        dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
+
+    return dependency_item
+
+
+def check_origin_of_dependencies(dependencies, checkout):
+    non_local_dependencies = {}
+
+    # handle locally available dependencies and filter out non-local ones
+    for name, dependency in dependencies.items():
+        shortcut = False
+        for checkout_dep in checkout:
+            if checkout_dep["name"] == name:
+                shortcut = True
+        if shortcut:
+            log.info(f'Dependency "{name}": available locally')
+            continue
+        
+        # fall-through
+        non_local_dependencies[name] = dependency
+
+    with multiprocessing.Pool() as pool:
+        modified_dependencies = pool.map(check_non_local_dependecy, non_local_dependencies.items())
+        for name, dependency in modified_dependencies:
+            dependencies[name] = dependency
+
+
 def main_handler(args):
     working_dir = Path(args.working_dir).expanduser().resolve()
 
@@ -1042,19 +1078,8 @@ def main_handler(args):
     workspace = EDM.parse_workspace_directory(workspace_dir)
     checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
 
-    known_branches = ["main", "master"]
-    for name, dependency in dependencies.items():
-        shortcut = False
-        for checkout_dep in checkout:
-            if checkout_dep["name"] == name:
-                shortcut = True
-        if shortcut:
-            log.info(f'Dependency "{name}": available locally')
-            continue
-        log.info(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
-        if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
-            log.info(f'Dependency "{name}": requesting remote rev')
-            dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
+    check_origin_of_dependencies(dependencies, checkout)
+
     EDM.write_cmake(workspace, checkout, dependencies, out_file)
 
 
