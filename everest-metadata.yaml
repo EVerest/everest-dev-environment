@@ -1,0 +1,92 @@
+catch2:
+  name: "Catch2"
+  description: "A modern, C++-native, test framework for unit-tests, TDD and BDD - using C++14, C++17 and later"
+  license: "BSL-1.0"
+date:
+  name: "Date"
+  description: "A date and time library based on the C++11/14/17 <chrono> header"
+  license: "MIT"
+ext-mbedtls:
+  name: "Mbed TLS"
+  description: "An open source, portable, easy to use, readable and flexible SSL library"
+  license: "Apache-2.0"
+ext-openv2g:
+  name: "OpenV2G"
+  description: "An open source project implementing the basic functionality of the ISO IEC 15118 vehicle to grid (V2G) communication interface"
+  license: "LGPL-3.0+"
+gtest:
+  name: "GoogleTest"
+  description: "GoogleTest - Google Testing and Mocking Framework"
+  license: "BSD-3-Clause"
+libfmt:
+  name: "{fmt}"
+  description: "A modern formatting library"
+  license: "MIT"
+libwebsockets:
+  name: "Libwebsockets"
+  description: "Canonical libwebsockets.org networking library"
+  license: "MIT"
+mqttc:
+  name: "MQTT-C"
+  description: "A portable MQTT C client for embedded systems and PCs alike."
+  license: "MIT"
+nlohmann_json:
+  description: "JSON for Modern C++"
+  license: "MIT"
+nlohmann_json_schema_validator:
+  description: "JSON schema validator for JSON for Modern C++"
+  license: "MIT"
+pugixml:
+  description: "Light-weight, simple and fast XML parser for C++ with XPath support"
+  license: "MIT"
+pybind11:
+  description: "Seamless operability between C++11 and Python"
+  license: "BSD-3-Clause"
+pybind11_json:
+  description: "Using nlohmann::json with pybind11"
+  license: "BSD-3-Clause"
+ryml:
+  name: "Rapid YAML"
+  description: "Rapid YAML - a library to parse and emit YAML, and do it fast."
+  license: "MIT"
+sigslot:
+  name: "Sigslot, a signal-slot library"
+  description: "A simple C++14 signal-slots implementation "
+  license: "MIT"
+websocketpp:
+  name: "WebSocket++"
+  description: "C++ websocket client/server library"
+  license: "BSD-3-Clause"
+everest-core:
+  description: "This is the main part of EVerest containing the actual charge controller logic included in a large set of modules"
+  license: "Apache-2.0"
+everest-framework:
+  description: "Provides a mechanism to manage dependencies between different modules communicating with a wrapped MQTT protocol"
+  license: "Apache-2.0"
+libfsm:
+  description: "A tiny C++14 library for writing maintainable finite state machines"
+  license: "Apache-2.0"
+liblog:
+  description: "C++ logging and exceptions library for the EVerest framework"
+  license: "Apache-2.0"
+libmodbus:
+  description: "This is an implementation of the MODBUS communication protocol"
+  license: "Apache-2.0"
+libocpp:
+  description: "This is a C++ library implementation of OCPP for version 1.6 and 2.0.1"
+  license: "Apache-2.0"
+libslac:
+  description: "Simple ISO15118-3 SLAC library"
+  license: "Apache-2.0"
+libsunspec:
+  description: "This is an implementation of SunSpec for utilization within EVerest"
+  license: "Apache-2.0"
+libtimer:
+  description: "C++ timer library for the EVerest framework"
+  license: "Apache-2.0"
+Josev:
+  description: "Implementation of the ISO 15118 Communication Protocol (-2, -20, -8)"
+  license: "Apache-2.0"
+RISE-V2G:
+  description: "The only fully-featured reference implementation of the Vehicle-2-Grid communication interface ISO 15118"
+  license: "MIT"

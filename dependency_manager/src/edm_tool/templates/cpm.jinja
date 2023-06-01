@@ -43,4 +43,11 @@ endif()
 
 {% endfor %}
 
+execute_process(
+    COMMAND edm release --everest-core-dir ${PROJECT_SOURCE_DIR} --build-dir ${CMAKE_BINARY_DIR} --out ${CMAKE_BINARY_DIR}/release.json
+)
 
+install(
+    FILES "${CMAKE_BINARY_DIR}/release.json"
+    DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/everest"
+)

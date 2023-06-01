@@ -17,7 +17,8 @@ import sys
 import shutil
 import multiprocessing
 import requests
-import tempfile
+import re
+import datetime
 
 
 log = logging.getLogger("edm")
@@ -339,6 +340,19 @@ class GitInfo:
         return rev
 
     @classmethod
+    def get_current_short_rev(cls, path: Path) -> str:
+        """Return the currently checked out short ref of the repo at path, or an empty str."""
+        rev = ""
+        try:
+            result = subprocess.run(["git", "-C", path, "rev-parse", "--short", "HEAD"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            rev = result.stdout.decode("utf-8").replace("\n", "")
+        except subprocess.CalledProcessError:
+            return rev
+
+        return rev
+
+    @classmethod
     def is_tag(cls, remote: str, tag: str) -> bool:
         """Return True if the given tag can be found on the given remote."""
         try:
@@ -382,6 +396,7 @@ class GitInfo:
             repo_info["dirty"] = GitInfo.is_dirty(repo_path)
             repo_info["detached"] = GitInfo.is_detached(repo_path)
             repo_info["rev"] = GitInfo.get_current_rev(repo_path)
+            repo_info["short_rev"] = GitInfo.get_current_short_rev(repo_path)
             repo_info["url"] = GitInfo.get_remote_url(repo_path)
         return repo_info
 
@@ -1107,7 +1122,7 @@ def check_origin_of_dependencies(dependencies, checkout):
         if shortcut:
             log.info(f'Dependency "{name}": available locally')
             continue
-        
+
         # fall-through
         non_local_dependencies[name] = dependency
 
@@ -1115,6 +1130,114 @@ def check_origin_of_dependencies(dependencies, checkout):
         modified_dependencies = pool.map(check_non_local_dependecy, non_local_dependencies.items())
         for name, dependency in modified_dependencies:
             dependencies[name] = dependency
+
+
+def release_handler(args):
+    """Handler for the edm release subcommand"""
+    everest_core_path = Path(args.everest_core_dir)
+    build_path = Path(args.build_dir)
+    release_path = Path(args.out)
+
+    metadata_yaml = {}
+    metadata_file = os.environ.get('EVEREST_METADATA_FILE', None)
+    metadata_url = "https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/everest-metadata.yaml"
+
+    if not metadata_file:
+        metadata_path = build_path / "everest-metadata.yaml"
+        if not metadata_path.exists():
+            log.info("No metadata.yaml provided, downloading...")
+            try:
+                request = requests.get(metadata_url, allow_redirects=True)
+
+                with open(metadata_path, 'wb') as metadata:
+                    metadata.write(request.content)
+            except requests.exceptions.RequestException as e:
+                log.info("Could not download metadata file, creating release.json without metadata")
+    else:
+        metadata_path = Path(metadata_file)
+    if metadata_path.exists():
+        log.info(f"Using metadata file: {metadata_path}")
+        with open(metadata_path, encoding='utf-8') as metadata_file:
+            metadata_yaml_data = yaml.safe_load(metadata_file)
+            if metadata_yaml_data:
+                metadata_yaml = metadata_yaml_data
+
+    cpm_modules_path = build_path / "CPM_modules"
+    everest_core_repo_info = GitInfo.get_git_repo_info(everest_core_path)
+    if everest_core_repo_info["branch"]:
+        everest_core_repo_info_git_tag = everest_core_repo_info["branch"] + "@" + everest_core_repo_info["short_rev"]
+    if everest_core_repo_info["tag"]:
+        everest_core_repo_info_git_tag = everest_core_repo_info["tag"]
+    snapshot_yaml = {"everest-core": {"git_tag": everest_core_repo_info_git_tag}}
+    for cpm_module_file in sorted(cpm_modules_path.glob("*/")):
+        if not cpm_module_file.is_file():
+            continue
+        with open(cpm_module_file, encoding='utf-8', mode='r') as cpm_module:
+            cpm_add_package_line = None
+            for line in cpm_module:
+                if line.startswith("CPMAddPackage("):
+                    cpm_add_package_line = line.strip().replace("CPMAddPackage(\"", "").replace("\")", "")+";"
+                    break
+            name = None
+            git_repo = None
+            git_tag = None
+            source_dir = None
+            name_match = re.search("NAME;(.*?);", cpm_add_package_line)
+            if name_match:
+                name = name_match.group(1)
+            git_repo_match = re.search("GIT_REPOSITORY;(.*?);", cpm_add_package_line)
+            if git_repo_match:
+                git_repo = git_repo_match.group(1)
+            git_tag_match = re.search("GIT_TAG;(.*?);", cpm_add_package_line)
+            if git_tag_match:
+                git_tag = git_tag_match.group(1)
+            source_dir_match = re.search("SOURCE_DIR;(.*?);", cpm_add_package_line)
+            if source_dir_match:
+                source_dir = source_dir_match.group(1)
+
+            if not name:
+                print("  no NAME found?")
+                exit(1)
+            if not source_dir and not git_tag:
+                print("  no source dir found, cannot determine git tag")
+                exit(1)
+
+            if not git_repo and source_dir:
+                repo_info = GitInfo.get_git_repo_info(source_dir)
+                if repo_info["branch"]:
+                    git_tag = repo_info["branch"] + "@" + repo_info["short_rev"]
+                if repo_info["tag"]:
+                    git_tag = repo_info["tag"]
+                if repo_info["url"]:
+                    git_repo = repo_info["url"]
+
+            snapshot_yaml[name] = {"git_tag": git_tag}
+
+    d = datetime.datetime.utcnow()
+    now = d.isoformat("T") + "Z"
+    channel = os.environ.get('EVEREST_UPDATE_CHANNEL', "unknown")
+
+    release_json = {"channel": channel, "datetime": now,
+                    "version": snapshot_yaml["everest-core"]["git_tag"], "components": []}
+
+    snapshot_yaml = dict(sorted(snapshot_yaml.items(), key=lambda entry: (entry[0].swapcase())))
+
+    for key in snapshot_yaml:
+        entry = snapshot_yaml[key]
+        meta = {"description": "", "license": "unknown", "name": key}
+        if key in metadata_yaml:
+            meta_entry = metadata_yaml[key]
+            meta['description'] = meta_entry.get('description', '')
+            meta['license'] = meta_entry.get('license', 'unknown')
+            meta["name"] = meta_entry.get("name", key)
+        component = {'name': meta["name"], 'version': entry['git_tag'],
+                     'description': meta['description'], 'license': meta['license']}
+        release_json['components'].append(component)
+
+    with open(release_path, 'w', encoding='utf-8') as release_file:
+        release_file.write(json.dumps(release_json))
+
+    sys.exit(0)
 
 
 def main_handler(args):
@@ -1324,6 +1447,24 @@ def get_parser(version) -> argparse.ArgumentParser:
         nargs="?",
         const="snapshot-config.yaml",
         required=False)
+
+    release_parser = subparsers.add_parser('release', add_help=True)
+    release_parser.set_defaults(action_handler=release_handler)
+    release_parser.add_argument(
+        "--everest-core-dir",
+        help="Path to everest-core",
+        nargs="?",
+        default="everest-core")
+    release_parser.add_argument(
+        "--build-dir",
+        help="Path to everest-core build dir",
+        nargs="?",
+        default="build")
+    release_parser.add_argument(
+        "--out",
+        help="Path to release.json file",
+        nargs="?",
+        default="release.json")
 
     parser.set_defaults(action_handler=main_handler)
 
