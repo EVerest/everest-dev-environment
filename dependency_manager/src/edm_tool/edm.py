@@ -644,13 +644,14 @@ class EDM:
             log.info(f"{pull_error_count}/{repo_count} repositories could not be pulled.")
 
     @classmethod
-    def scan_dependencies(cls, working_dir: Path, include_deps: list, files_to_ignore: set = []) -> Tuple[dict, set]:
+    def scan_dependencies(cls, working_dir: Path, include_deps: list, files_to_ignore: set = None) -> Tuple[dict, set]:
         """Scan working_dir for dependencies."""
         log.info(f"Scanning \"{working_dir}\" for dependencies.")
         dependencies_files = set(list(working_dir.glob("**/dependencies.yaml")) +
                                  list(working_dir.glob("**/dependencies.yml")))
 
-        dependencies_files.difference_update(files_to_ignore)
+        if files_to_ignore:
+            dependencies_files.difference_update(files_to_ignore)
 
         dependencies = {}
         for dependencies_file in dependencies_files:
@@ -912,7 +913,7 @@ def init_handler(args):
     if args.release:
         log.info(f"Checking if requested EVerest release \"{args.release}\" is available...")
     else:
-        log.info(f"No release specified, checking for most recent stable version...")
+        log.info("No release specified, checking for most recent stable version...")
 
     github_key_available = EDM.check_github_key()
 
@@ -947,7 +948,7 @@ def init_handler(args):
 
     # now we have the basics, get the rest recursively
     iterations = 10
-    old_snapshot = dict()
+    old_snapshot = {}
     config = {}
     scanned_dependencies_files = set()
     for i in range(iterations):
@@ -1081,7 +1082,7 @@ def snapshot_handler(args):
     iterations = 1
     if args.recursive:
         iterations = args.recursive
-    old_snapshot = dict()
+    old_snapshot = {}
     for i in range(iterations):
         if i > 0:
             # only do recursive parsing if explicitly requested
@@ -1147,11 +1148,11 @@ def release_handler(args):
         if not metadata_path.exists():
             log.info("No metadata.yaml provided, downloading...")
             try:
-                request = requests.get(metadata_url, allow_redirects=True)
+                request = requests.get(metadata_url, allow_redirects=True, timeout=3)
 
                 with open(metadata_path, 'wb') as metadata:
                     metadata.write(request.content)
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException:
                 log.info("Could not download metadata file, creating release.json without metadata")
     else:
         metadata_path = Path(metadata_file)
@@ -1197,10 +1198,10 @@ def release_handler(args):
 
             if not name:
                 print("  no NAME found?")
-                exit(1)
+                sys.exit(1)
             if not source_dir and not git_tag:
                 print("  no source dir found, cannot determine git tag")
-                exit(1)
+                sys.exit(1)
 
             if not git_repo and source_dir:
                 repo_info = GitInfo.get_git_repo_info(source_dir)
