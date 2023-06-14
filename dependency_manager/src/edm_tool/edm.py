@@ -1165,6 +1165,9 @@ def release_handler(args):
 
     cpm_modules_path = build_path / "CPM_modules"
     everest_core_repo_info = GitInfo.get_git_repo_info(everest_core_path)
+    everest_core_repo_info_git_tag = "unknown"
+    if everest_core_repo_info["rev"]:
+        everest_core_repo_info_git_tag = everest_core_repo_info["rev"]
     if everest_core_repo_info["branch"]:
         everest_core_repo_info_git_tag = everest_core_repo_info["branch"] + "@" + everest_core_repo_info["short_rev"]
     if everest_core_repo_info["tag"]:
