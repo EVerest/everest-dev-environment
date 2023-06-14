@@ -1148,12 +1148,12 @@ def release_handler(args):
         if not metadata_path.exists():
             log.info("No metadata.yaml provided, downloading...")
             try:
-                request = requests.get(metadata_url, allow_redirects=True, timeout=3)
+                request = requests.get(metadata_url, allow_redirects=True, timeout=10)
 
                 with open(metadata_path, 'wb') as metadata:
                     metadata.write(request.content)
-            except requests.exceptions.RequestException:
-                log.info("Could not download metadata file, creating release.json without metadata")
+            except requests.exceptions.RequestException as e:
+                log.info(f"Could not download metadata file, creating release.json without metadata: {e}")
     else:
         metadata_path = Path(metadata_file)
     if metadata_path.exists():
