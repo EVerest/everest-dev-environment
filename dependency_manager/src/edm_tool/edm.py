@@ -24,6 +24,7 @@ import datetime
 log = logging.getLogger("edm")
 edm_config_dir_path = Path("~/.config/everest").expanduser().resolve()
 edm_config_path = edm_config_dir_path / "edm.yaml"
+metadata_timeout_s = 10
 
 
 class LocalDependencyCheckoutError(Exception):
@@ -1148,12 +1149,12 @@ def release_handler(args):
         if not metadata_path.exists():
             log.info("No metadata.yaml provided, downloading...")
             try:
-                request = requests.get(metadata_url, allow_redirects=True, timeout=3)
+                request = requests.get(metadata_url, allow_redirects=True, timeout=metadata_timeout_s)
 
                 with open(metadata_path, 'wb') as metadata:
                     metadata.write(request.content)
-            except requests.exceptions.RequestException:
-                log.info("Could not download metadata file, creating release.json without metadata")
+            except requests.exceptions.RequestException as e:
+                log.info(f"Could not download metadata file, creating release.json without metadata: {e}")
     else:
         metadata_path = Path(metadata_file)
     if metadata_path.exists():
@@ -1165,6 +1166,9 @@ def release_handler(args):
 
     cpm_modules_path = build_path / "CPM_modules"
     everest_core_repo_info = GitInfo.get_git_repo_info(everest_core_path)
+    everest_core_repo_info_git_tag = "unknown"
+    if everest_core_repo_info["rev"]:
+        everest_core_repo_info_git_tag = everest_core_repo_info["rev"]
     if everest_core_repo_info["branch"]:
         everest_core_repo_info_git_tag = everest_core_repo_info["branch"] + "@" + everest_core_repo_info["short_rev"]
     if everest_core_repo_info["tag"]:
