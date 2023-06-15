@@ -24,6 +24,7 @@ import datetime
 log = logging.getLogger("edm")
 edm_config_dir_path = Path("~/.config/everest").expanduser().resolve()
 edm_config_path = edm_config_dir_path / "edm.yaml"
+metadata_timeout_s = 10
 
 
 class LocalDependencyCheckoutError(Exception):
@@ -1148,7 +1149,7 @@ def release_handler(args):
         if not metadata_path.exists():
             log.info("No metadata.yaml provided, downloading...")
             try:
-                request = requests.get(metadata_url, allow_redirects=True, timeout=10)
+                request = requests.get(metadata_url, allow_redirects=True, timeout=metadata_timeout_s)
 
                 with open(metadata_path, 'wb') as metadata:
                     metadata.write(request.content)
