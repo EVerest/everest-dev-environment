@@ -30,7 +30,7 @@ Now you can clone *this repository* and install **edm**:
 git clone git@github.com:EVerest/everest-dev-environment.git
 cd everest-dev-environment/dependency_manager
 python3 -m pip install .
-edm --register-cmake-module --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
+edm --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
 ```
 
 The last command registers the [**EDM** CMake module](#setting-up-cmake-integration) and creates a workspace in the *~/checkout/everest-workspace* directory from [a config that is shipped with this repository](../everest-complete.yaml).
