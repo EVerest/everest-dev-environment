@@ -328,6 +328,23 @@ class GitInfo:
         return remote_tags
 
     @classmethod
+    def get_remote_branches(cls, remote_url: str) -> list:
+        """Return the remote branches of the repo at path, or an empty list."""
+        remote_branches = []
+        try:
+            result = subprocess.run(["git", "ls-remote", "--heads", "--quiet", remote_url],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            result_list = result.stdout.decode("utf-8").split("\n")
+            for entry in result_list:
+                ref_and_tag = entry.split("\t")
+                if len(ref_and_tag) > 1:
+                    remote_branches.append(ref_and_tag[1].replace("refs/heads/", ""))
+        except subprocess.CalledProcessError:
+            return remote_branches
+
+        return remote_branches
+
+    @classmethod
     def get_current_rev(cls, path: Path) -> str:
         """Return the currently checked out ref of the repo at path, or an empty str."""
         rev = ""
@@ -822,7 +839,18 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, c
                 log.debug(f"    Repo is not dirty, checking out requested git tag \"{git_tag}\"")
                 GitInfo.checkout_rev(checkout_dir, git_tag)
     else:
-        clone_dependency_repo(git, git_tag, checkout_dir)
+        try:
+            clone_dependency_repo(git, git_tag, checkout_dir)
+        except LocalDependencyCheckoutError as e:
+            # maybe the given tag was actually a rev?
+            if not git_rev:
+                # assume git_tag is git_rev
+                log.info(f"No git_rev given, but git_tag \"{git_tag}\" might be a git_rev, trying to checkout this rev.")
+                git_rev = git_tag
+                git_tag = None
+                clone_dependency_repo(git, git_tag, checkout_dir)
+            else:
+                raise e
 
     if git_rev is not None:
         log.debug(f"    Checking out requested git rev \"{git_rev}\"")
@@ -941,8 +969,13 @@ def init_handler(args):
                 latest_tag = repo["release"]
                 log.info(f"Requested release is available: {repo['release']}")
             else:
-                log.error(f"Requested release is NOT available: {repo['release']}")
-                sys.exit(1)
+                branches = GitInfo.get_remote_branches(repo["repo"])
+                if repo["release"] in branches:
+                    latest_tag = repo["release"]
+                    log.info(f"Requested branch is available: {repo['release']}")
+                else:
+                    log.error(f"Requested release is NOT available: {repo['release']}")
+                    sys.exit(1)
 
         log.info(f"Using \"{Color.GREEN}{repo['name']}{Color.CLEAR}\" @ {latest_tag}")
         checkout_local_dependency(repo["name"], repo["repo"], latest_tag, None, working_dir / repo["name"], False)
