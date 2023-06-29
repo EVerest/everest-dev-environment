@@ -1385,7 +1385,7 @@ def get_parser(version) -> argparse.ArgumentParser:
     # parser.add_argument("--interactive", action='store_true',
     #                     help="Interactively ask which repositories should be checked out.")
 
-    subparsers = parser.add_subparsers(help='available commands', required=False)
+    subparsers = parser.add_subparsers(help='available commands')
 
     init_parser = subparsers.add_parser('init', add_help=True)
     init_parser.add_argument(
@@ -1417,7 +1417,7 @@ def get_parser(version) -> argparse.ArgumentParser:
         nargs=1)
 
     git_parser = subparsers.add_parser('git', add_help=True)
-    git_subparsers = git_parser.add_subparsers(help='available git commands', required=False)
+    git_subparsers = git_parser.add_subparsers(help='available git commands')
 
     git_info_parser = git_subparsers.add_parser('info', add_help=True)
     git_info_parser.add_argument(
