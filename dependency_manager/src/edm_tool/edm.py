@@ -1134,6 +1134,18 @@ def check_origin_of_dependencies(dependencies, checkout):
             dependencies[name] = dependency
 
 
+def populate_component(metadata_yaml, key, version):
+    meta = {"description": "", "license": "unknown", "name": key}
+    if key in metadata_yaml:
+        meta_entry = metadata_yaml[key]
+        meta['description'] = meta_entry.get('description', '')
+        meta['license'] = meta_entry.get('license', 'unknown')
+        meta["name"] = meta_entry.get("name", key)
+    component = {'name': meta["name"], 'version': version,
+                    'description': meta['description'], 'license': meta['license']}
+    return component
+
+
 def release_handler(args):
     """Handler for the edm release subcommand"""
     everest_core_path = Path(args.everest_core_dir)
@@ -1221,6 +1233,7 @@ def release_handler(args):
     d = datetime.datetime.utcnow()
     now = d.isoformat("T") + "Z"
     channel = os.environ.get('EVEREST_UPDATE_CHANNEL', "unknown")
+    include_all = os.environ.get('EVEREST_METADATA_INCLUDE_ALL', "no")
 
     release_json = {"channel": channel, "datetime": now,
                     "version": snapshot_yaml["everest-core"]["git_tag"], "components": []}
@@ -1229,15 +1242,19 @@ def release_handler(args):
 
     for key in snapshot_yaml:
         entry = snapshot_yaml[key]
-        meta = {"description": "", "license": "unknown", "name": key}
-        if key in metadata_yaml:
-            meta_entry = metadata_yaml[key]
-            meta['description'] = meta_entry.get('description', '')
-            meta['license'] = meta_entry.get('license', 'unknown')
-            meta["name"] = meta_entry.get("name", key)
-        component = {'name': meta["name"], 'version': entry['git_tag'],
-                     'description': meta['description'], 'license': meta['license']}
+        component = populate_component(metadata_yaml, key, entry['git_tag'])
         release_json['components'].append(component)
+
+    if include_all == "yes":
+        for key in metadata_yaml:
+            component = populate_component(metadata_yaml, key, '')
+            exists = False
+            for existing_component in release_json['components']:
+                if existing_component["name"] == component["name"]:
+                    exists = True
+            if exists:
+                continue
+            release_json['components'].append(component)
 
     with open(release_path, 'w', encoding='utf-8') as release_file:
         release_file.write(json.dumps(release_json))
