@@ -34,7 +34,7 @@ edm --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
 ```
 
 The last command registers the [**EDM** CMake module](#setting-up-cmake-integration) and creates a workspace in the *~/checkout/everest-workspace* directory from [a config that is shipped with this repository](../everest-complete.yaml).
-The workspace will have the following structure containing all current dependencies for everest:
+The workspace will have the following structure containing all current dependencies for EVerest:
 ```bash
 everest-workspace/
 ├── everest-core
@@ -77,13 +77,15 @@ edm --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
 ```
 
 ## Updating a workspace
-To update a workspace you can edit the *workspace-config.yaml* file in the root of the workspace. You can then use the following command to apply these changes.
+To update a workspace you can edit the *workspace-config.yaml* file in the root of the workspace. You can then use the following command to apply these changes:
+
 ```bash
-edm --workspace ~/checkout/everest-workspace --update
+edm init --workspace ~/checkout/everest-workspace
 ```
-If you are currently in the *everest-workspace* directory the following command has the same effect.
+If you are currently in the *everest-workspace* directory the following command has the same effect:
+
 ```bash
-edm --update
+edm init
 ```
 
 Be advised that even if you remove a repository from the config file it WILL NOT be deleted from the workspace.
@@ -91,6 +93,7 @@ Be advised that even if you remove a repository from the config file it WILL NOT
 An attempt will be made to switch branches to the ones specified in the config, however this will be aborted if the repository is *dirty*.
 
 Repositories also WILL NOT be pulled, you should check the state of your repositories afterwards with the commands described in [Git information at a glance](#git-information-at-a-glance)
+
 ## Using the EDM CMake module and dependencies.yaml
 To use **edm** from CMake you have to add the following line to the top-level *CMakeLists.txt* file in the respective source repository:
 ```cmake
