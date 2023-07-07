@@ -68,22 +68,12 @@ If you installed **edm** using the guide above they were already installed autom
 - Jinja2 >= 3.0
 - PyYAML >= 5.4
 
-## Setting up CMake integration
-To use the **EDM** CMake module you **must** register it in the [CMake package registry](https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/Package-Registry#user).
-You can use the following command to achieve this:
-
-```bash
-edm --register-cmake-module
-```
-This will create a file at *~/.cmake/packages/EDM/edm* that points to the directory in which the **EDM** CMake module has been installed.
-You probably have to do this only once after the initial installation, but be advised that this might have to be done again if you reinstall **edm** with a different version of Python.
-
 ## Setting up a workspace
 A sample workspace config, [everest-complete.yaml](../everest-complete.yaml), for the EVerest project is provided in the root directory of this repository.
 You can set up this workspace with the following command.
 
 ```bash
-edm --register-cmake-module --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
+edm --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
 ```
 
 ## Updating a workspace
