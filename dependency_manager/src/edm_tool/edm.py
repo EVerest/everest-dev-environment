@@ -849,6 +849,10 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, c
                 git_rev = git_tag
                 git_tag = None
                 clone_dependency_repo(git, git_tag, checkout_dir)
+            elif git_rev and git_tag:
+                log.info(f"Both git_rev and git_tag given, but git_tag \"{git_tag}\" might be a git_rev, trying to checkout git_rev \"{git_rev}\" instead.")
+                git_tag = None
+                clone_dependency_repo(git, git_tag, checkout_dir)
             else:
                 raise e
 
