@@ -954,6 +954,10 @@ def init_handler(args):
     """Handler for the edm init subcommand"""
     working_dir = Path(args.working_dir).expanduser().resolve()
 
+    if args.workspace:
+        log.info(f"Using provided workspace path \"{args.workspace}\"")
+        working_dir = Path(args.workspace)
+
     config_path = working_dir / "workspace-config.yaml"
 
     if args.list:
