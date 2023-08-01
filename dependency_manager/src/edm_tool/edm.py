@@ -133,21 +133,32 @@ def prettify(lst: list, indent: int) -> str:
     return output
 
 
-def pretty_print(lst: list, indent: int):
+def pretty_print(lst: list, indent: int, log_level: int):
     """Debug log every list element with the given indentation."""
     space = " " * indent
     for out in lst:
         if out and out != "\n":
-            log.debug(f"{space}{out}")
+            if log_level == logging.DEBUG:
+                log.debug(f"{space}{out}")
+            elif log_level == logging.INFO:
+                log.info(f"{space}{out}")
+            elif log_level == logging.WARNING:
+                log.warning(f"{space}{out}")
+            elif log_level == logging.ERROR:
+                log.error(f"{space}{out}")
+            elif log_level == logging.CRITICAL:
+                log.critical(f"{space}{out}")
+            else:
+                log.info(f"{space}{out}")
 
 
-def pretty_print_process(c: subprocess.CompletedProcess, indent: int):
+def pretty_print_process(c: subprocess.CompletedProcess, indent: int, log_level: int):
     """Pretty print stdout and stderr of a CompletedProcess object."""
     stdout = c.stdout.decode("utf-8").split("\n")
-    pretty_print(stdout, indent)
+    pretty_print(stdout, indent, log_level)
 
     stderr = c.stderr.decode("utf-8").split("\n")
-    pretty_print(stderr, indent)
+    pretty_print(stderr, indent, log_level)
 
 
 def pattern_matches(string: str, patterns: list) -> bool:
@@ -459,9 +470,9 @@ class GitInfo:
         try:
             result = subprocess.run(["git", "-C", checkout_dir, "checkout", rev],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            pretty_print_process(result, 4)
+            pretty_print_process(result, 4, logging.DEBUG)
         except subprocess.CalledProcessError as result:
-            pretty_print_process(result, 4)
+            pretty_print_process(result, 4, logging.DEBUG)
 
 
 class EDM:
@@ -815,10 +826,11 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, c
 
         try:
             result = subprocess.run(git_clone_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            pretty_print_process(result, 4)
+            pretty_print_process(result, 4, logging.DEBUG)
         except subprocess.CalledProcessError as e:
-            error_message = f"   Error while cloning git repository during local dependency checkout: {str(e.stderr.decode())}"
-            log.error(error_message)
+            error_message = "   Error while cloning git repository during local dependency checkout:"
+            log.warning(error_message)
+            pretty_print(e.stderr.decode().strip().split("\n"), 6, logging.WARNING)
             raise LocalDependencyCheckoutError(error_message) from e
 
     log.info(f"Setting up dependency \"{Color.GREEN}{name}{Color.CLEAR}\" in workspace")
@@ -826,6 +838,7 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, c
     log.debug(f"  git-tag: \"{git_tag}\"")
     log.debug(f"  git-rev: \"{git_rev}\"")
     log.debug(f"  local directory: \"{checkout_dir}\"")
+    git_tag_is_git_rev = False
     if checkout_dir.exists():
         log.debug(f"    ... the directory for dependency \"{name}\" already exists at \"{checkout_dir}\".")
         # check if git is dirty
@@ -845,20 +858,25 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, c
             # maybe the given tag was actually a rev?
             if not git_rev:
                 # assume git_tag is git_rev
-                log.info(f"No git_rev given, but git_tag \"{git_tag}\" might be a git_rev, trying to checkout this rev.")
+                log.info(f"    No git_rev given, but git_tag \"{git_tag}\" might be a git_rev, trying to checkout this rev.")
                 git_rev = git_tag
                 git_tag = None
                 clone_dependency_repo(git, git_tag, checkout_dir)
+                git_tag_is_git_rev = True
             elif git_rev and git_tag:
-                log.info(f"Both git_rev and git_tag given, but git_tag \"{git_tag}\" might be a git_rev, trying to checkout git_rev \"{git_rev}\" instead.")
+                log.info(f"    Both git_rev and git_tag given, but git_tag \"{git_tag}\" might be a git_rev,"
+                         f" trying to checkout git_rev \"{git_rev}\" instead.")
                 git_tag = None
                 clone_dependency_repo(git, git_tag, checkout_dir)
+                git_tag_is_git_rev = True
             else:
                 raise e
 
     if git_rev is not None:
         log.debug(f"    Checking out requested git rev \"{git_rev}\"")
         GitInfo.checkout_rev(checkout_dir, git_rev)
+        if git_tag_is_git_rev:
+            log.info(f"    Successfully checked out git_rev \"{git_rev}\" of dependency \"{Color.GREEN}{name}{Color.CLEAR}\"")
 
     return {"name": name, "path": checkout_dir, "git_tag": git_tag}
 
@@ -936,6 +954,10 @@ def init_handler(args):
     """Handler for the edm init subcommand"""
     working_dir = Path(args.working_dir).expanduser().resolve()
 
+    if args.workspace:
+        log.info(f"Using provided workspace path \"{args.workspace}\"")
+        working_dir = Path(args.workspace)
+
     config_path = working_dir / "workspace-config.yaml"
 
     if args.list:
@@ -945,6 +967,10 @@ def init_handler(args):
 
     if args.release:
         log.info(f"Checking if requested EVerest release \"{args.release}\" is available...")
+    elif args.config:
+        log.info(f"Using supplied config \"{args.config}\"")
+        main_handler(args)
+        return
     else:
         log.info("No release specified, checking for most recent stable version...")
 
