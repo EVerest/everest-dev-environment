@@ -945,6 +945,10 @@ def init_handler(args):
 
     if args.release:
         log.info(f"Checking if requested EVerest release \"{args.release}\" is available...")
+    elif args.config:
+        log.info(f"Using supplied config \"{args.config}\"")
+        main_handler(args)
+        return
     else:
         log.info("No release specified, checking for most recent stable version...")
 
