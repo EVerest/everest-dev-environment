@@ -81,16 +81,20 @@ If you are currently in the *everest-workspace* directory the following command 
 edm init
 ```
 
-> **NOTE:** Advanced users would eventually want to use their customized lib versions or
-branches of repos. This can be achieved by editing the workspace-config.yaml
-file in the root of the workspace and using *edm init* to update your workspace
-directory.
+> **NOTE:** Advanced users would eventually want to use their customized lib versions
+> or branches of repos. This can be achieved by editing the workspace-config.yaml
+> file in the root of the workspace and using *edm init* to update your workspace
+> directory.
 >
-> Be advised that even if you remove a repository from the config file it WILL NOT be deleted from the workspace.
+> Be advised that even if you remove a repository from the config file it WILL NOT
+> be deleted from the workspace.
 >
-> An attempt will be made to switch branches to the ones specified in the config, however this will be aborted if the repository is *dirty*.
+> An attempt will be made to switch branches to the ones specified in the config,
+> however this will be aborted if the repository is *dirty*.
 >
-> Repositories also WILL NOT be pulled, you should check the state of your repositories afterwards with the commands described in [Git information at a glance](#git-information-at-a-glance)
+> Repositories also WILL NOT be pulled, you should check the state of your
+> repositories afterwards with the commands described
+> in [Git information at a glance](#git-information-at-a-glance)
 
 ## Using the EDM CMake module and dependencies.yaml
 To use **edm** from CMake you have to add the following line to the top-level *CMakeLists.txt* file in the respective source repository:
