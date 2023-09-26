@@ -68,16 +68,9 @@ If you installed **edm** using the guide above they were already installed autom
 - Jinja2 >= 3.0
 - PyYAML >= 5.4
 
-## Setting up a workspace
-A sample workspace config, [everest-complete.yaml](../everest-complete.yaml), for the EVerest project is provided in the root directory of this repository.
-You can set up this workspace with the following command.
-
-```bash
-edm --config ../everest-complete.yaml --workspace ~/checkout/everest-workspace
-```
-
-## Updating a workspace
-To update a workspace you can edit the *workspace-config.yaml* file in the root of the workspace. You can then use the following command to apply these changes:
+## Setting up and updating a workspace
+For letting **edm** do the work of setting up an initial EVerest workspace,
+do this:
 
 ```bash
 edm init --workspace ~/checkout/everest-workspace
@@ -88,11 +81,14 @@ If you are currently in the *everest-workspace* directory the following command 
 edm init
 ```
 
-Be advised that even if you remove a repository from the config file it WILL NOT be deleted from the workspace.
+For using a dedicated release version, you can do this:
 
-An attempt will be made to switch branches to the ones specified in the config, however this will be aborted if the repository is *dirty*.
+```bash
+edm init 2023.7.0
+```
 
-Repositories also WILL NOT be pulled, you should check the state of your repositories afterwards with the commands described in [Git information at a glance](#git-information-at-a-glance)
+In this example, version 2023.7.0 is pulled from the server. This will only work if
+you previous code is not in a "dirty" state. 
 
 ## Using the EDM CMake module and dependencies.yaml
 To use **edm** from CMake you have to add the following line to the top-level *CMakeLists.txt* file in the respective source repository:
