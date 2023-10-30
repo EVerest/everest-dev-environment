@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 - 2022 Pionix GmbH and Contributors to EVerest
+# Copyright 2020 - 2023 Pionix GmbH and Contributors to EVerest
 #
 """Everest Dependency Manager."""
 import argparse
@@ -25,6 +25,10 @@ log = logging.getLogger("edm")
 edm_config_dir_path = Path("~/.config/everest").expanduser().resolve()
 edm_config_path = edm_config_dir_path / "edm.yaml"
 metadata_timeout_s = 10
+offline_mode = False
+edm_offline_mode = os.environ.get('EVEREST_EDM_OFFLINE', "no")
+if edm_offline_mode == "yes":
+    offline_mode = True
 
 
 class LocalDependencyCheckoutError(Exception):
@@ -1167,6 +1171,8 @@ def check_non_local_dependecy(dependency_item):
 
     known_branches = ["main", "master"]
 
+    if offline_mode:
+        return dependency_item
     log.info(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
     if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
         log.info(f'Dependency "{name}": requesting remote rev')
@@ -1190,6 +1196,9 @@ def check_origin_of_dependencies(dependencies, checkout):
 
         # fall-through
         non_local_dependencies[name] = dependency
+
+    if offline_mode:
+        log.info(f'Using edm in offline mode, not attempting to distinguish tags and branch names')
 
     with multiprocessing.Pool() as pool:
         modified_dependencies = pool.map(check_non_local_dependecy, non_local_dependencies.items())
