@@ -6,7 +6,11 @@ set(CPM_{{ dep["name"] }}_SOURCE "{{ dep["path"] }}")
 {% for name, value in dependencies.items() %}
 if("{{name}}" IN_LIST EVEREST_EXCLUDE_DEPENDENCIES)
     message(STATUS "Excluding dependency {{name}}")
+{% if "condition" in value %}
+elseif({{ value["condition"] }})
+{% else %}
 else()
+{% endif %}
 {% if value and "git" in value %}
 CPMAddPackage(
     NAME {{ name }}
