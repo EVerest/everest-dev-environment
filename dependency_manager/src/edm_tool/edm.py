@@ -1198,7 +1198,7 @@ def check_origin_of_dependencies(dependencies, checkout):
         non_local_dependencies[name] = dependency
 
     if offline_mode:
-        log.info(f'Using edm in offline mode, not attempting to distinguish tags and branch names')
+        log.info('Using edm in offline mode, not attempting to distinguish tags and branch names')
 
     with multiprocessing.Pool() as pool:
         modified_dependencies = pool.map(check_non_local_dependecy, non_local_dependencies.items())
