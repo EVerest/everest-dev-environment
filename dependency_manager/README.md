@@ -111,26 +111,15 @@ libtimer:
 
 ```
 
-If you want to automatically check out certain dependencies into a *workspace* you can add a **workspace.yaml** file to the root of your source repository. It should look like this:
+If you want to conditionally include some dependencies, eg. for testing, you can do this in the following way:
 ```yaml
----
-workspace: ~/workspace
-local_dependencies:
-  liblog:
-  libtimer:
+catch2:
+  git: https://github.com/catchorg/Catch2.git
+  git_tag: v3.4.0
+  condition: "BUILD_TESTING"
 
 ```
-
-You can overwrite the git_tag in your **workspace.yaml**, so you can use a development version in your workspace:
-```yaml
----
-workspace: ~/workspace
-local_dependencies:
-  liblog:
-    git_tag: devel
-  timer:
-
-```
+Here _condition_ can be any string that CMake can use in an if() block. Please be aware that any variables you use here must be defined before a call to _evc_setup_edm()_ is made in your CMakeLists.txt
 
 ## Create a workspace config from an existing directory tree
 Suppose you already have a directory tree that you want to save into a config file.
