@@ -43,6 +43,10 @@ if({{name}}_ADDED)
   add_library({{value["alias"]["name"]}} ALIAS {{value["alias"]["target"]}})
 endif()
 {% endif %}
+{% if "cmake_condition" in value and value["cmake_condition"]|length > 0 %}
+else()
+    message(STATUS "Excluding dependency catch2 based on cmake_condition")
+{% endif %}
 endif()
 
 {% endfor %}
