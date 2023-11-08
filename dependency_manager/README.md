@@ -116,10 +116,10 @@ If you want to conditionally include some dependencies, eg. for testing, you can
 catch2:
   git: https://github.com/catchorg/Catch2.git
   git_tag: v3.4.0
-  condition: "BUILD_TESTING"
+  cmake_condition: "BUILD_TESTING"
 
 ```
-Here _condition_ can be any string that CMake can use in an if() block. Please be aware that any variables you use here must be defined before a call to _evc_setup_edm()_ is made in your CMakeLists.txt
+Here *cmake_condition* can be any string that CMake can use in an if() block. Please be aware that any variables you use here must be defined before a call to _evc_setup_edm()_ is made in your CMakeLists.txt
 
 ## Create a workspace config from an existing directory tree
 Suppose you already have a directory tree that you want to save into a config file.

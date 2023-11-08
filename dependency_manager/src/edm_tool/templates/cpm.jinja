@@ -6,8 +6,8 @@ set(CPM_{{ dep["name"] }}_SOURCE "{{ dep["path"] }}")
 {% for name, value in dependencies.items() %}
 if("{{name}}" IN_LIST EVEREST_EXCLUDE_DEPENDENCIES)
     message(STATUS "Excluding dependency {{name}}")
-{% if "condition" in value %}
-elseif({{ value["condition"] }})
+{% if "cmake_condition" in value %}
+elseif({{ value["cmake_condition"] }})
 {% else %}
 else()
 {% endif %}
