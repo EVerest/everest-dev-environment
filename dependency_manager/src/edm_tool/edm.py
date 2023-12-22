@@ -1251,7 +1251,8 @@ def modify_dependencies(dependencies, modify_dependencies_file):
         except yaml.YAMLError as e:
             log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
 
-def populate_component(metadata_yaml, key, version):
+
+def populate_component(metadata_yaml, key, version, url):
     meta = {"description": "", "license": "unknown", "name": key}
     if key in metadata_yaml:
         meta_entry = metadata_yaml[key]
@@ -1259,7 +1260,7 @@ def populate_component(metadata_yaml, key, version):
         meta['license'] = meta_entry.get('license', 'unknown')
         meta["name"] = meta_entry.get("name", key)
     component = {'name': meta["name"], 'version': version,
-                    'description': meta['description'], 'license': meta['license']}
+                    'description': meta['description'], 'license': meta['license'], 'url': url}
     return component
 
 
@@ -1345,7 +1346,7 @@ def release_handler(args):
                 if repo_info["url"]:
                     git_repo = repo_info["url"]
 
-            snapshot_yaml[name] = {"git_tag": git_tag}
+            snapshot_yaml[name] = {"git_tag": git_tag, "url": git_repo}
 
     d = datetime.datetime.utcnow()
     now = d.isoformat("T") + "Z"
@@ -1359,7 +1360,7 @@ def release_handler(args):
 
     for key in snapshot_yaml:
         entry = snapshot_yaml[key]
-        component = populate_component(metadata_yaml, key, entry['git_tag'])
+        component = populate_component(metadata_yaml, key, entry['git_tag'], entry['url'])
         release_json['components'].append(component)
 
     if include_all == "yes":
