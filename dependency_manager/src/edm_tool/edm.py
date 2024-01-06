@@ -1267,6 +1267,7 @@ def populate_component(metadata_yaml, key, version, url):
 def release_handler(args):
     """Handler for the edm release subcommand"""
     everest_core_path = Path(args.everest_core_dir)
+    everest_core_name = everest_core_path.stem
     build_path = Path(args.build_dir)
     release_path = Path(args.out)
 
@@ -1303,7 +1304,7 @@ def release_handler(args):
         everest_core_repo_info_git_tag = everest_core_repo_info["branch"] + "@" + everest_core_repo_info["short_rev"]
     if everest_core_repo_info["tag"]:
         everest_core_repo_info_git_tag = everest_core_repo_info["tag"]
-    snapshot_yaml = {"everest-core": {"git_tag": everest_core_repo_info_git_tag}}
+    snapshot_yaml = {everest_core_name: {"git_tag": everest_core_repo_info_git_tag, "url": everest_core_repo_info["url"]}}
     for cpm_module_file in sorted(cpm_modules_path.glob("*/")):
         if not cpm_module_file.is_file():
             continue
@@ -1354,7 +1355,7 @@ def release_handler(args):
     include_all = os.environ.get('EVEREST_METADATA_INCLUDE_ALL', "no")
 
     release_json = {"channel": channel, "datetime": now,
-                    "version": snapshot_yaml["everest-core"]["git_tag"], "components": []}
+                    "version": snapshot_yaml[everest_core_name]["git_tag"], "components": []}
 
     snapshot_yaml = dict(sorted(snapshot_yaml.items(), key=lambda entry: (entry[0].swapcase())))
 
