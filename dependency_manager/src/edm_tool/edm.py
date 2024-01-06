@@ -1340,6 +1340,8 @@ def release_handler(args):
 
             if not git_repo and source_dir:
                 repo_info = GitInfo.get_git_repo_info(source_dir)
+                if repo_info["short_rev"]:
+                    git_tag = repo_info["short_rev"]
                 if repo_info["branch"]:
                     git_tag = repo_info["branch"] + "@" + repo_info["short_rev"]
                 if repo_info["tag"]:
