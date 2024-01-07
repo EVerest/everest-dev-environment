@@ -1252,7 +1252,7 @@ def modify_dependencies(dependencies, modify_dependencies_file):
             log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
 
 
-def populate_component(metadata_yaml, key, version, url):
+def populate_component(metadata_yaml, key, version, url, dependent):
     meta = {"description": "", "license": "unknown", "name": key}
     if key in metadata_yaml:
         meta_entry = metadata_yaml[key]
@@ -1260,7 +1260,8 @@ def populate_component(metadata_yaml, key, version, url):
         meta['license'] = meta_entry.get('license', 'unknown')
         meta["name"] = meta_entry.get("name", key)
     component = {'name': meta["name"], 'version': version,
-                    'description': meta['description'], 'license': meta['license'], 'url': url}
+                 'description': meta['description'], 'license': meta['license'],
+                 'url': url, 'dependent': dependent}
     return component
 
 
@@ -1304,7 +1305,8 @@ def release_handler(args):
         everest_core_repo_info_git_tag = everest_core_repo_info["branch"] + "@" + everest_core_repo_info["short_rev"]
     if everest_core_repo_info["tag"]:
         everest_core_repo_info_git_tag = everest_core_repo_info["tag"]
-    snapshot_yaml = {everest_core_name: {"git_tag": everest_core_repo_info_git_tag, "url": everest_core_repo_info["url"]}}
+    snapshot_yaml = {everest_core_name: {"git_tag": everest_core_repo_info_git_tag,
+                                         "url": everest_core_repo_info["url"], "dependent": []}}
     for cpm_module_file in sorted(cpm_modules_path.glob("*/")):
         if not cpm_module_file.is_file():
             continue
@@ -1349,7 +1351,7 @@ def release_handler(args):
                 if repo_info["url"]:
                     git_repo = repo_info["url"]
 
-            snapshot_yaml[name] = {"git_tag": git_tag, "url": git_repo}
+            snapshot_yaml[name] = {"git_tag": git_tag, "url": git_repo, "dependent": []}
 
     d = datetime.datetime.utcnow()
     now = d.isoformat("T") + "Z"
@@ -1361,14 +1363,29 @@ def release_handler(args):
 
     snapshot_yaml = dict(sorted(snapshot_yaml.items(), key=lambda entry: (entry[0].swapcase())))
 
+    # find dependents
+    for dependencies_file in sorted(build_path.rglob("dependencies.cmake.everest.yaml")):
+        with open(dependencies_file, encoding='utf-8') as dep:
+            try:
+                dependencies_yaml = yaml.safe_load(dep)
+                if dependencies_yaml is not None:
+                    name = dependencies_yaml['name']
+                    # now do a reverse lookup in the snapshot yaml and add this name to the dependent field
+                    for key in dependencies_yaml['dependencies']:
+                        if key in snapshot_yaml:
+                            entry = snapshot_yaml[key]
+                            entry['dependent'].append(name)
+            except yaml.YAMLError as e:
+                log.error(f"Error parsing yaml of \"{dependencies_file}\": {e}")
+
     for key in snapshot_yaml:
         entry = snapshot_yaml[key]
-        component = populate_component(metadata_yaml, key, entry['git_tag'], entry['url'])
+        component = populate_component(metadata_yaml, key, entry['git_tag'], entry['url'], entry['dependent'])
         release_json['components'].append(component)
 
     if include_all == "yes":
         for key in metadata_yaml:
-            component = populate_component(metadata_yaml, key, '')
+            component = populate_component(metadata_yaml, key, '', '', [])
             exists = False
             for existing_component in release_json['components']:
                 if existing_component["name"] == component["name"]:
@@ -1457,6 +1474,12 @@ def main_handler(args):
     check_origin_of_dependencies(dependencies, checkout)
 
     EDM.write_cmake(workspace, checkout, dependencies, out_file)
+
+    # write easily parsable dependency file, this can be used to reconstruct who depends on which dependency
+    out_file_yaml = out_file.parent / f"{out_file.name}.everest.yaml"
+    with open(out_file_yaml, 'w', encoding='utf-8') as out:
+        dependencies_out = {'name': working_dir.stem, 'dependencies': dependencies}
+        yaml.dump(dependencies_out, out)
 
 
 def get_parser(version) -> argparse.ArgumentParser:
