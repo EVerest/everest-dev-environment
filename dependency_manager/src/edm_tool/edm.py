@@ -747,7 +747,6 @@ class EDM:
                 log.info(f"Using workspace directory \"{workspace_dir}\" from command line.")
             elif "workspace" in workspace:
                 workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
-                log.info(f"Using workspace directory \"{workspace_dir}\".")
             else:
                 print("Cannot checkout requested dependencies without a workspace directory, stopping.")
                 sys.exit(1)
@@ -1167,10 +1166,12 @@ def check_non_local_dependecy(dependency_item):
 
     known_branches = ["main", "master"]
 
-    log.info(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
+    log.debug(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
     if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
-        log.info(f'Dependency "{name}": requesting remote rev')
+        log.info(f'Dependency "{name}": "{dependency["git_tag"]}" is not a tag, requesting remote rev')
         dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
+    else:
+        log.info(f'Dependency "{name}": "{dependency["git_tag"]}" is a tag')
 
     return dependency_item
 
@@ -1234,6 +1235,7 @@ def modify_dependencies(dependencies, modify_dependencies_file):
                                 dependency[modification_name] = modification_entry
             except yaml.YAMLError as e:
                 log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
+
 
 def populate_component(metadata_yaml, key, version):
     meta = {"description": "", "license": "unknown", "name": key}
