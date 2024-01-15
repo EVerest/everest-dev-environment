@@ -121,6 +121,24 @@ catch2:
 ```
 Here *cmake_condition* can be any string that CMake can use in an if() block. Please be aware that any variables you use here must be defined before a call to *evc_setup_edm()* is made in your CMakeLists.txt
 
+Additionally you can set the *EVEREST_MODIFY_DEPENDENCIES* environment variable to a file containing modifications to the projects dependencies.yaml files when running cmake:
+
+```bash
+EVEREST_MODIFY_DEPENDENCIES=../dependencies_modified.yaml cmake -S . -B build
+```
+
+The *dependencies_modified.yaml* file can contain something along these lines:
+
+```yaml
+nlohmann_json:
+  git: null # this makes edm look for nlohmann_json via find_package
+libfmt:
+  rename: fmt # if find_package needs a different dependency name you can rename it
+  git: null
+catch2:
+  git_tag: v1.2.3 # if you want to select a different git tag for a build this is also possible
+```
+
 ## Create a workspace config from an existing directory tree
 Suppose you already have a directory tree that you want to save into a config file.
 You can do this with the following command:
