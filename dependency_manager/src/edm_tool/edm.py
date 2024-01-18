@@ -1164,6 +1164,14 @@ def snapshot_handler(args):
 def check_non_local_dependecy(dependency_item):
     name, dependency = dependency_item
 
+    if "git" not in dependency or dependency["git"] == None:
+        log.warning(f'Dependency "{name}": git is not set')
+        return dependency_item
+
+    if "git_tag" not in dependency or dependency["git_tag"] == None:
+        log.warning(f'Dependency "{name}": git_tag is not set')
+        return dependency_item
+
     known_branches = ["main", "master"]
 
     log.debug(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
