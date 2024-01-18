@@ -1220,7 +1220,10 @@ def modify_dependencies(dependencies, modify_dependencies_file):
                 return
             for name, entry in modified_dependencies_yaml.items():
                 if name not in dependencies:
-                    continue
+                    if "add" in entry:
+                        dependencies[name] = {}
+                    else:
+                        continue
                 dependency = dependencies[name]
                 if not entry:
                     continue
@@ -1241,8 +1244,9 @@ def modify_dependencies(dependencies, modify_dependencies_file):
                             log.info(f'Dependency "{name}": Deleting "{modification_name}"')
                             del dependency[modification_name]
                     else:
-                        log.info(f'Dependency "{name}": Adding "{modification_name}" containing "{modification_entry}"')
-                        dependency[modification_name] = modification_entry
+                        if modification_entry:
+                            log.info(f'Dependency "{name}": Adding "{modification_name}" containing "{modification_entry}"')
+                            dependency[modification_name] = modification_entry
         except yaml.YAMLError as e:
             log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
 
