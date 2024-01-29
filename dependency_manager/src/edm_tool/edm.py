@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 - 2022 Pionix GmbH and Contributors to EVerest
+# Copyright Pionix GmbH and Contributors to EVerest
 #
 """Everest Dependency Manager."""
 import argparse
@@ -1209,47 +1209,47 @@ def check_origin_of_dependencies(dependencies, checkout):
             dependencies[name] = dependency
 
 
+def modify_dependencies_yaml(dependencies, modified_dependencies_yaml):
+    for name, entry in modified_dependencies_yaml.items():
+        if name not in dependencies:
+            if "add" in entry:
+                dependencies[name] = {}
+            else:
+                continue
+        dependency = dependencies[name]
+        if not entry:
+            continue
+
+        if "rename" in entry:
+            new_name = entry["rename"]
+            log.info(f'Dependency "{name}": Renaming to "{new_name}"')
+            dependencies[new_name] = dependencies.pop(name)
+            name = new_name
+            dependency = dependencies[name]
+
+        for modification_name, modification_entry in entry.items():
+            if modification_name in dependency:
+                if modification_entry:
+                    log.info(f'Dependency "{name}": Changing "{modification_name}" to "{modification_entry}"')
+                    dependency[modification_name] = modification_entry
+                else:
+                    log.info(f'Dependency "{name}": Deleting "{modification_name}"')
+                    del dependency[modification_name]
+            else:
+                if modification_entry:
+                    log.info(f'Dependency "{name}": Adding "{modification_name}" containing "{modification_entry}"')
+                    dependency[modification_name] = modification_entry
+
+
 def modify_dependencies(dependencies, modify_dependencies_file):
-    if not modify_dependencies_file.is_file():
-        return
     log.info(f'Modifying dependencies with file: {modify_dependencies_file}')
     with open(modify_dependencies_file, encoding='utf-8') as modified_dependencies_file:
         try:
             modified_dependencies_yaml = yaml.safe_load(modified_dependencies_file)
-            if not modified_dependencies_yaml:
-                return
-            for name, entry in modified_dependencies_yaml.items():
-                if name not in dependencies:
-                    if "add" in entry:
-                        dependencies[name] = {}
-                    else:
-                        continue
-                dependency = dependencies[name]
-                if not entry:
-                    continue
-
-                if "rename" in entry:
-                    new_name = entry["rename"]
-                    log.info(f'Dependency "{name}": Renaming to "{new_name}"')
-                    dependencies[new_name] = dependencies.pop(name)
-                    name = new_name
-                    dependency = dependencies[name]
-
-                for modification_name, modification_entry in entry.items():
-                    if modification_name in dependency:
-                        if modification_entry:
-                            log.info(f'Dependency "{name}": Changing "{modification_name}" to "{modification_entry}"')
-                            dependency[modification_name] = modification_entry
-                        else:
-                            log.info(f'Dependency "{name}": Deleting "{modification_name}"')
-                            del dependency[modification_name]
-                    else:
-                        if modification_entry:
-                            log.info(f'Dependency "{name}": Adding "{modification_name}" containing "{modification_entry}"')
-                            dependency[modification_name] = modification_entry
+            if modified_dependencies_yaml:
+                modify_dependencies_yaml(dependencies, modified_dependencies_yaml)
         except yaml.YAMLError as e:
             log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
-
 
 def populate_component(metadata_yaml, key, version):
     meta = {"description": "", "license": "unknown", "name": key}
@@ -1447,7 +1447,8 @@ def main_handler(args):
     env_modify_dependencies = os.environ.get('EVEREST_MODIFY_DEPENDENCIES')
     if env_modify_dependencies:
         modify_dependencies_file = Path(env_modify_dependencies).expanduser().resolve()
-        modify_dependencies(dependencies, modify_dependencies_file)
+        if modify_dependencies_file.is_file():
+            modify_dependencies(dependencies, modify_dependencies_file)
 
     check_origin_of_dependencies(dependencies, checkout)
 
