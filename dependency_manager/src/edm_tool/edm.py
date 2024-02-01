@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2020 - 2022 Pionix GmbH and Contributors to EVerest
+# Copyright Pionix GmbH and Contributors to EVerest
 #
 """Everest Dependency Manager."""
 import argparse
@@ -747,7 +747,6 @@ class EDM:
                 log.info(f"Using workspace directory \"{workspace_dir}\" from command line.")
             elif "workspace" in workspace:
                 workspace_dir = Path(workspace["workspace"]).expanduser().resolve()
-                log.info(f"Using workspace directory \"{workspace_dir}\".")
             else:
                 print("Cannot checkout requested dependencies without a workspace directory, stopping.")
                 sys.exit(1)
@@ -1165,12 +1164,22 @@ def snapshot_handler(args):
 def check_non_local_dependecy(dependency_item):
     name, dependency = dependency_item
 
+    if "git" not in dependency or dependency["git"] is None:
+        log.warning(f'Dependency "{name}": git is not set')
+        return dependency_item
+
+    if "git_tag" not in dependency or dependency["git_tag"] is None:
+        log.warning(f'Dependency "{name}": git_tag is not set')
+        return dependency_item
+
     known_branches = ["main", "master"]
 
-    log.info(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
+    log.debug(f'Dependency "{name}": determining if "{dependency["git_tag"]}" is a tag')
     if dependency["git_tag"] in known_branches or not GitInfo.is_tag(dependency["git"], dependency["git_tag"]):
-        log.info(f'Dependency "{name}": requesting remote rev')
+        log.info(f'Dependency "{name}": "{dependency["git_tag"]}" is not a tag, requesting remote rev')
         dependency["git_tag"] = GitInfo.get_rev(dependency["git"], dependency["git_tag"])
+    else:
+        log.info(f'Dependency "{name}": "{dependency["git_tag"]}" is a tag')
 
     return dependency_item
 
@@ -1180,6 +1189,9 @@ def check_origin_of_dependencies(dependencies, checkout):
 
     # handle locally available dependencies and filter out non-local ones
     for name, dependency in dependencies.items():
+        if "git" not in dependency:
+            log.info(f'Dependency "{name}": Using package instead of git url')
+            continue
         shortcut = False
         for checkout_dep in checkout:
             if checkout_dep["name"] == name:
@@ -1196,6 +1208,48 @@ def check_origin_of_dependencies(dependencies, checkout):
         for name, dependency in modified_dependencies:
             dependencies[name] = dependency
 
+
+def modify_dependencies_yaml(dependencies, modified_dependencies_yaml):
+    for name, entry in modified_dependencies_yaml.items():
+        if name not in dependencies:
+            if "add" in entry:
+                dependencies[name] = {}
+            else:
+                continue
+        dependency = dependencies[name]
+        if not entry:
+            continue
+
+        if "rename" in entry:
+            new_name = entry["rename"]
+            log.info(f'Dependency "{name}": Renaming to "{new_name}"')
+            dependencies[new_name] = dependencies.pop(name)
+            name = new_name
+            dependency = dependencies[name]
+
+        for modification_name, modification_entry in entry.items():
+            if modification_name in dependency:
+                if modification_entry:
+                    log.info(f'Dependency "{name}": Changing "{modification_name}" to "{modification_entry}"')
+                    dependency[modification_name] = modification_entry
+                else:
+                    log.info(f'Dependency "{name}": Deleting "{modification_name}"')
+                    del dependency[modification_name]
+            else:
+                if modification_entry:
+                    log.info(f'Dependency "{name}": Adding "{modification_name}" containing "{modification_entry}"')
+                    dependency[modification_name] = modification_entry
+
+
+def modify_dependencies(dependencies, modify_dependencies_file):
+    log.info(f'Modifying dependencies with file: {modify_dependencies_file}')
+    with open(modify_dependencies_file, encoding='utf-8') as modified_dependencies_file:
+        try:
+            modified_dependencies_yaml = yaml.safe_load(modified_dependencies_file)
+            if modified_dependencies_yaml:
+                modify_dependencies_yaml(dependencies, modified_dependencies_yaml)
+        except yaml.YAMLError as e:
+            log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
 
 def populate_component(metadata_yaml, key, version):
     meta = {"description": "", "license": "unknown", "name": key}
@@ -1388,6 +1442,13 @@ def main_handler(args):
 
     workspace = EDM.parse_workspace_directory(workspace_dir)
     checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
+
+    # modify dependencies from environment variable
+    env_modify_dependencies = os.environ.get('EVEREST_MODIFY_DEPENDENCIES')
+    if env_modify_dependencies:
+        modify_dependencies_file = Path(env_modify_dependencies).expanduser().resolve()
+        if modify_dependencies_file.is_file():
+            modify_dependencies(dependencies, modify_dependencies_file)
 
     check_origin_of_dependencies(dependencies, checkout)
 

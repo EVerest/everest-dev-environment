@@ -45,7 +45,7 @@ endif()
 {% endif %}
 {% if "cmake_condition" in value and value["cmake_condition"]|length > 0 %}
 else()
-    message(STATUS "Excluding dependency catch2 based on cmake_condition")
+    message(STATUS "Excluding dependency {{name}} based on cmake_condition")
 {% endif %}
 endif()
 
