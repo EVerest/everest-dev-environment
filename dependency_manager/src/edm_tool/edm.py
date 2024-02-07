@@ -1357,6 +1357,7 @@ def release_handler(args):
     now = d.isoformat("T") + "Z"
     channel = os.environ.get('EVEREST_UPDATE_CHANNEL', "unknown")
     include_all = os.environ.get('EVEREST_METADATA_INCLUDE_ALL', "no")
+    include_url = os.environ.get('EVEREST_METADATA_INCLUDE_URL', "no")
 
     release_json = {"channel": channel, "datetime": now,
                     "version": snapshot_yaml[everest_core_name]["git_tag"], "components": []}
@@ -1380,7 +1381,10 @@ def release_handler(args):
 
     for key in snapshot_yaml:
         entry = snapshot_yaml[key]
-        component = populate_component(metadata_yaml, key, entry['git_tag'], entry['url'], entry['dependent'])
+        url = ''
+        if include_url == "yes":
+            url = entry['url']
+        component = populate_component(metadata_yaml, key, entry['git_tag'], url, entry['dependent'])
         release_json['components'].append(component)
 
     if include_all == "yes":
