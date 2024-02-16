@@ -1272,7 +1272,9 @@ def populate_component(metadata_yaml, key, version, url, dependent):
         meta["name"] = meta_entry.get("name", key)
     component = {'name': meta["name"], 'version': version,
                  'description': meta['description'], 'license': meta['license'],
-                 'url': url, 'dependent': dependent}
+                 'dependent': dependent}
+    if url:
+        component['url'] = url
     return component
 
 
@@ -1392,7 +1394,7 @@ def release_handler(args):
 
     for key in snapshot_yaml:
         entry = snapshot_yaml[key]
-        url = ''
+        url = None
         if include_url:
             url = entry['url']
         component = populate_component(metadata_yaml, key, entry['git_tag'], url, entry['dependent'])
@@ -1400,7 +1402,7 @@ def release_handler(args):
 
     if include_all:
         for key in metadata_yaml:
-            component = populate_component(metadata_yaml, key, '', '', [])
+            component = populate_component(metadata_yaml, key, '', None, [])
             exists = False
             for existing_component in release_json['components']:
                 if existing_component["name"] == component["name"]:
