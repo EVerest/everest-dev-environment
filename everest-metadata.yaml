@@ -141,6 +141,13 @@ Josev:
 RISE-V2G:
   description: "The only fully-featured reference implementation of the Vehicle-2-Grid communication interface ISO 15118"
   license: "MIT"
+libcurl:
+  name: "curl"
+  description: "A command line tool and library for transferring data with URL syntax"
+  license: "curl License"
+libevse-security:
+  description: "This is a C++ library for security related operations for charging stations"
+  license: "Apache-2.0"
 
 # from everest-dev-environment
 edm:
@@ -201,6 +208,11 @@ ryml:
   name: "Rapid YAML"
   description: "Rapid YAML - a library to parse and emit YAML, and do it fast."
   license: "MIT"
+
+everest-utils:
+  name: "everest-utils"
+  description: "Utilities for code generation, testing and development of EVerest"
+  license: "Apache-2.0"
 
 # from everest-utils
 ev-dev-tools:
