@@ -172,6 +172,17 @@ def pattern_matches(string: str, patterns: list) -> bool:
     return matches
 
 
+def is_environment_variable_true(environment_variable: str) -> bool:
+    """Parses the given environment_variable string and:
+    Return True if it matches "1" "yes" "on" (case-insensitive)
+    Return False if not
+    """
+    positive = ["1", "yes", "on"]
+    if environment_variable.casefold() in positive:
+        return True
+    return False
+
+
 class GitInfo:
     """Provide information about git repositories."""
 
@@ -1356,8 +1367,8 @@ def release_handler(args):
     d = datetime.datetime.utcnow()
     now = d.isoformat("T") + "Z"
     channel = os.environ.get('EVEREST_UPDATE_CHANNEL', "unknown")
-    include_all = os.environ.get('EVEREST_METADATA_INCLUDE_ALL', "no")
-    include_url = os.environ.get('EVEREST_METADATA_INCLUDE_URL', "no")
+    include_all = is_environment_variable_true(os.environ.get('EVEREST_METADATA_INCLUDE_ALL', "no"))
+    include_url = is_environment_variable_true(os.environ.get('EVEREST_METADATA_INCLUDE_URL', "no"))
 
     release_json = {"channel": channel, "datetime": now,
                     "version": snapshot_yaml[everest_core_name]["git_tag"], "components": []}
@@ -1382,12 +1393,12 @@ def release_handler(args):
     for key in snapshot_yaml:
         entry = snapshot_yaml[key]
         url = ''
-        if include_url == "yes":
+        if include_url:
             url = entry['url']
         component = populate_component(metadata_yaml, key, entry['git_tag'], url, entry['dependent'])
         release_json['components'].append(component)
 
-    if include_all == "yes":
+    if include_all:
         for key in metadata_yaml:
             component = populate_component(metadata_yaml, key, '', '', [])
             exists = False
