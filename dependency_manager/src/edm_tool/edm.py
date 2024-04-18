@@ -326,7 +326,7 @@ class GitInfo:
         """Return the remote tags of the repo at path, or an empty list."""
         remote_tags = []
         try:
-            result = subprocess.run(["git", "ls-remote", "--tags", "--sort=-v:refname", "--refs", "--quiet", remote_url],
+            result = subprocess.run(["git", "-c", "versionsort.suffix=-", "ls-remote", "--tags", "--sort=-v:refname", "--refs", "--quiet", remote_url],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
             result_list = result.stdout.decode("utf-8").split("\n")
             for entry in result_list:
