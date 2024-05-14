@@ -19,6 +19,7 @@ import multiprocessing
 import requests
 import re
 import datetime
+import string
 
 
 log = logging.getLogger("edm")
@@ -617,7 +618,7 @@ class EDM:
                     log.debug(f"  tag: {tag}")
                     entry["git_tag"] = tag
                 except subprocess.CalledProcessError:
-                    log.warning(f"Skipping {name} because no branch or tag could be determined.")
+                    log.warning(f"No branch or tag could be determined for dependency {name}.")
                     continue
             new_config[name] = entry
 
@@ -851,6 +852,12 @@ def checkout_local_dependency(name: str, git: str, git_tag: str, git_rev: str, c
                 log.debug(f"    Repo is not dirty, checking out requested git tag \"{git_tag}\"")
                 GitInfo.checkout_rev(checkout_dir, git_tag)
     else:
+        # check if git_tag is a 40 character hex string and assume it is a git_rev
+        if len(git_tag) == 40 and all(character in string.hexdigits for character in git_tag):
+            log.debug(f"    git_tag \"{git_tag}\" might be a git_rev, trying to checkout this rev.")
+            git_rev = git_tag
+            git_tag = None
+            git_tag_is_git_rev = True
         try:
             clone_dependency_repo(git, git_tag, checkout_dir)
         except LocalDependencyCheckoutError as e:
