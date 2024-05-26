@@ -1,11 +1,13 @@
-#!/usr/bin/env python3
-import yaml
-from argparse import ArgumentParser
-from pathlib import Path
+"Bazel related functions for edm_tool."
 import sys
 
+import yaml
+
+
 def generate_deps(args):
-    deps = yaml.safe_load(open(args.dependencies_yaml, 'r'))
+    "Parse the dependencies.yaml and print content of *.bzl file to stdout."
+    with open(args.dependencies_yaml, 'r', encoding='utf-8') as f:
+        deps = yaml.safe_load(f)
     print("Buid files: ", args.build_file, file=sys.stderr)
     if args.build_file:
         build_files = dict((f.split(":")[1], f) for f in args.build_file)
@@ -13,7 +15,9 @@ def generate_deps(args):
         build_files = {}
 
     print('load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")')
-    print('load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")')
+    print(
+        'load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")'
+    )
     print()
     print()
 
@@ -29,7 +33,7 @@ def generate_deps(args):
             tag, commit = "None", f'"{tag}"'
         else:
             tag, commit = f'"{tag}"', "None"
-        
+
         build_file_name = f"BUILD.{name}.bazel"
         if build_file_name in build_files:
             build_file_label = build_files[build_file_name]
