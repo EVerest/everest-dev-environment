@@ -19,6 +19,7 @@ import multiprocessing
 import requests
 import re
 import datetime
+import edm_tool.bazel as bazel
 
 
 log = logging.getLogger("edm")
@@ -1611,6 +1612,21 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Path to release.json file",
         nargs="?",
         default="release.json")
+    
+    bazel_parser = subparsers.add_parser(
+        'bazel',
+        description="""Convert dependencies.yaml file into a file that can be used in Bazel workspace.""",
+        add_help=True)
+    bazel_parser.set_defaults(action_handler=bazel.generate_deps)
+    bazel_parser.add_argument(
+        "dependencies_yaml",
+        type=Path,
+        help="Path to dependencies.yaml")
+    bazel_parser.add_argument(
+        "-b", "--build-file",
+        type=str,
+        action="append",
+        required=False)
 
     parser.set_defaults(action_handler=main_handler)
 
