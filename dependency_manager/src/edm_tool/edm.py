@@ -1626,11 +1626,11 @@ def get_parser(version) -> argparse.ArgumentParser:
         "-b", "--build-file",
         type=str,
         action="append",
-        help="Bazel-style label for the build files into the deppendencies." +
-            "The format should be `@<workspace>//<path>:BUILD.<dependency-name>.bazel`." + 
-            "<dependency-name> should correspond to the name of the dependency in " +
-            "the dependencies.yaml file. This option can be used multiple times." + 
-            "If not provided, Bazel will search for BUILD file in the repo itself.",
+        help="Bazel-style label for the build files into the deppendencies. " +
+             "The format should be `@<workspace>//<path>:BUILD.<dependency-name>.bazel`." + 
+             "<dependency-name> should correspond to the name of the dependency in " +
+             "the dependencies.yaml file. This option can be used multiple times." + 
+             "If not provided, Bazel will search for BUILD file in the repo itself.",
         required=False)
 
     parser.set_defaults(action_handler=main_handler)

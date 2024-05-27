@@ -1,6 +1,4 @@
 "Bazel related functions for edm_tool."
-import sys
-
 import yaml
 
 
