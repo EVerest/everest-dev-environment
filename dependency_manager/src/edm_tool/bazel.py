@@ -8,23 +8,34 @@ def generate_deps(args):
     "Parse the dependencies.yaml and print content of *.bzl file to stdout."
     with open(args.dependencies_yaml, 'r', encoding='utf-8') as f:
         deps = yaml.safe_load(f)
-    print("Buid files: ", args.build_file, file=sys.stderr)
+    # For easier matching of build files with dependencies
+    # we convert the list of build files:
+    # ```
+    # [
+    #      "@workspace//path/to/build:BUILD.<depname>.bazel",
+    #      ...
+    # ]
+    # ```
+    # into a dictionary:
+    # ```
+    # {
+    #      "BUILD.<depname>.bazel": "@workspace//path/to/build:BUILD.<depname>.bazel",
+    #      ...
+    # }
+    # ```
     if args.build_file:
         build_files = dict((f.split(":")[1], f) for f in args.build_file)
     else:
         build_files = {}
 
-    print('load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")')
-    print(
-        'load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")'
-    )
-    print()
-    print()
+    print("""
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
-    print("def edm_deps():")
+def edm_deps():""")
 
     for name, desc in deps.items():
-        repo = desc['git']
+        repo = desc["git"]
         tag = desc["git_tag"]
         commit = "None"
 
@@ -36,8 +47,7 @@ def generate_deps(args):
 
         build_file_name = f"BUILD.{name}.bazel"
         if build_file_name in build_files:
-            build_file_label = build_files[build_file_name]
-            build_file = f'"{build_file_label}"'
+            build_file = f'"{build_files[build_file_name]}"'
         else:
             build_file = "None"
 
