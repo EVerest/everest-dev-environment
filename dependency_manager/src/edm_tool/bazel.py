@@ -1,11 +1,21 @@
 "Bazel related functions for edm_tool."
 import yaml
+from typing import List, Optional
 
 
-def generate_deps(args):
-    "Parse the dependencies.yaml and print content of *.bzl file to stdout."
-    with open(args.dependencies_yaml, 'r', encoding='utf-8') as f:
-        deps = yaml.safe_load(f)
+def _format_optional_string(value):
+    """Formats a string value as a string literal (with quotes) or `None` if the value is None."""
+    if value is None:
+        return "None"
+    return f'"{value}"'
+
+
+def _is_commit(revision):
+    # Revision is a commit if it is a hexadecimal 40-character string
+    return len(revision) == 40 and all(c in "0123456789abcdef" for c in revision.lower())
+
+
+def _parse_build_file_labels(labels: Optional[List[str]]):
     # For easier matching of build files with dependencies
     # we convert the list of build files:
     # ```
@@ -17,14 +27,33 @@ def generate_deps(args):
     # into a dictionary:
     # ```
     # {
-    #      "BUILD.<depname>.bazel": "@workspace//path/to/build:BUILD.<depname>.bazel",
+    #      "<depname>": "@workspace//path/to/build:BUILD.<depname>.bazel",
     #      ...
     # }
     # ```
-    if args.build_file:
-        build_files = dict((f.split(":")[1], f) for f in args.build_file)
-    else:
-        build_files = {}
+    # and check that all build files have proper names.
+    if labels is None:
+        return {}
+    build_files = {}
+    for label in labels:
+        build, depname, bazel = label.split(":")[1].split(".")
+        if build != "BUILD" or bazel != "bazel":
+            raise ValueError(f"Invalid build file name: {label}")
+        build_files[depname] = label
+
+    return build_files
+
+
+def generate_deps(args):
+    "Parse the dependencies.yaml and print content of *.bzl file to stdout."
+    with open(args.dependencies_yaml, 'r', encoding='utf-8') as f:
+        deps = yaml.safe_load(f)
+
+    build_files = _parse_build_file_labels(args.build_file)
+
+    for name in build_files:
+        if name not in deps:
+            raise ValueError(f"Build file {name} does not have a corresponding dependency in {args.dependencies_yaml}")
 
     print("""
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
@@ -34,20 +63,17 @@ def edm_deps():""")
 
     for name, desc in deps.items():
         repo = desc["git"]
-        tag = desc["git_tag"]
-        commit = "None"
+        # The parameter is called `git_tag` but it can be a tag or a commit
+        revision = desc["git_tag"]
+        tag = None
+        commit = None
 
-        # Check that tag is hexadecimal 40-character string
-        if len(tag) == 40 and all(c in "0123456789abcdef" for c in tag.lower()):
-            tag, commit = "None", f'"{tag}"'
+        if _is_commit(revision):
+            commit = revision
         else:
-            tag, commit = f'"{tag}"', "None"
+            tag = revision
 
-        build_file_name = f"BUILD.{name}.bazel"
-        if build_file_name in build_files:
-            build_file = f'"{build_files[build_file_name]}"'
-        else:
-            build_file = "None"
+        build_file = build_files.get(name)
 
         print(
             f"""
@@ -55,9 +81,9 @@ def edm_deps():""")
         git_repository,
         name = "{name}",
         remote = "{repo}",
-        tag = {tag},
-        commit = {commit},
-        build_file = {build_file},
+        tag = {_format_optional_string(tag)},
+        commit = {_format_optional_string(commit)},
+        build_file = {_format_optional_string(build_file)},
     )
 """
         )
