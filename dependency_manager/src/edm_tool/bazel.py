@@ -1,21 +1,26 @@
 "Bazel related functions for edm_tool."
 import yaml
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 
-def _format_optional_string(value):
+def _format_optional_string(value: Optional[str]):
     """Formats a string value as a string literal (with quotes) or `None` if the value is None."""
     if value is None:
         return "None"
     return f'"{value}"'
 
 
-def _is_commit(revision):
+def _is_commit(revision: str):
     # Revision is a commit if it is a hexadecimal 40-character string
     return len(revision) == 40 and all(c in "0123456789abcdef" for c in revision.lower())
 
+def _get_depname_for_label(label: str) -> str:
+    build, depname, bazel = label.split(":")[1].split(".")
+    if build != "BUILD" or bazel != "bazel":
+        raise ValueError(f"Invalid build file name: {label}")
+    return depname
 
-def _parse_build_file_labels(labels: Optional[List[str]]):
+def _parse_build_file_labels(labels: Optional[List[str]]) -> Dict[str, str]:
     # For easier matching of build files with dependencies
     # we convert the list of build files:
     # ```
@@ -34,14 +39,8 @@ def _parse_build_file_labels(labels: Optional[List[str]]):
     # and check that all build files have proper names.
     if labels is None:
         return {}
-    build_files = {}
-    for label in labels:
-        build, depname, bazel = label.split(":")[1].split(".")
-        if build != "BUILD" or bazel != "bazel":
-            raise ValueError(f"Invalid build file name: {label}")
-        build_files[depname] = label
 
-    return build_files
+    return dict((_get_depname_for_label(label), label) for label in labels)
 
 
 def generate_deps(args):
