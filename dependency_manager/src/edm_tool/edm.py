@@ -20,6 +20,8 @@ import requests
 import re
 import datetime
 
+from edm_tool import bazel
+
 
 log = logging.getLogger("edm")
 edm_config_dir_path = Path("~/.config/everest").expanduser().resolve()
@@ -1611,6 +1613,25 @@ def get_parser(version) -> argparse.ArgumentParser:
         help="Path to release.json file",
         nargs="?",
         default="release.json")
+    bazel_parser = subparsers.add_parser(
+        "bazel",
+        description="Convert dependencies.yaml file into a file that can be used in Bazel workspace.",
+        add_help=True)
+    bazel_parser.set_defaults(action_handler=bazel.generate_deps)
+    bazel_parser.add_argument(
+        "dependencies_yaml",
+        type=Path,
+        help="Path to dependencies.yaml")
+    bazel_parser.add_argument(
+        "-b", "--build-file",
+        type=str,
+        action="append",
+        help="Bazel-style label for the build files into the deppendencies. " +
+             "The format should be `@<workspace>//<path>:BUILD.<dependency-name>.bazel`." + 
+             "<dependency-name> should correspond to the name of the dependency in " +
+             "the dependencies.yaml file. This option can be used multiple times." + 
+             "If not provided, Bazel will search for BUILD file in the repo itself.",
+        required=False)
 
     parser.set_defaults(action_handler=main_handler)
 
