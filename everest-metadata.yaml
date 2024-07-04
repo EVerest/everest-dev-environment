@@ -207,6 +207,9 @@ websocketpp:
   name: "WebSocket++"
   description: "C++ websocket client/server library"
   license: "BSD-3-Clause"
+libevse-security:
+  description: "This is a C++ library for security related operations for charging stations"
+  license: "Apache-2.0"
 
 libslac:
   description: "Simple ISO15118-3 SLAC library"
