@@ -141,6 +141,21 @@ Josev:
 RISE-V2G:
   description: "The only fully-featured reference implementation of the Vehicle-2-Grid communication interface ISO 15118"
   license: "MIT"
+sqlite_cpp:
+  name: "SQLiteCpp"
+  description: "SQLiteC++ (SQLiteCpp) is a smart and easy to use C++ SQLite3 wrapper"
+  license: "MIT"
+libcurl:
+  name: "curl"
+  description: "A command line tool and library for transferring data with URL syntax, supporting DICT, FILE, FTP, FTPS, GOPHER, GOPHERS, HTTP, HTTPS, IMAP, IMAPS, LDAP, LDAPS, MQTT, POP3, POP3S, RTMP, RTMPS, RTSP, SCP, SFTP, SMB, SMBS, SMTP, SMTPS, TELNET, TFTP, WS and WSS. libcurl offers a myriad of powerful features"
+  license: "curl"
+libcbv2g:
+  name: "libcbV2G"
+  description: "libcbV2G - The V2GTP EXI codec library"
+  license: "Apache-2.0"
+everest-utils:
+  description: "EVerest utilities"
+  license: "Apache-2.0"
 
 # from everest-dev-environment
 edm:
