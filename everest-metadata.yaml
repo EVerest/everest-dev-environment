@@ -2,101 +2,6 @@ everest-admin-panel:
   name: "EVerest admin panel"
   description: "A beta-stage frontend for graphically editing the everest config file"
   license: "Apache-2.0"
-# dependencies of everest-admin-panel
-babel-parser:
-  license: "MIT"
-koumoul-vjsf:
-  license: "MIT"
-mdi-font:
-  license: "Apache-2.0 & MIT"
-mdi-js:
-  license: "Apache-2.0 & MIT"
-vue-compiler-sfc:
-  license: "MIT"
-ajv:
-  license: "MIT"
-ajv-formats:
-  license: "MIT"
-ajv-i18n:
-  license: "MIT"
-argparse:
-  license: "Python-2.0"
-core-js:
-  license: "MIT"
-csstype:
-  license: "MIT"
-debounce:
-  license: "MIT"
-debounce-promise:
-  license: "MIT"
-debug:
-  license: "MIT"
-entities:
-  license: "BSD-3-Clause"
-expr-eval:
-  license: "MIT"
-fast-copy:
-  license: "MIT"
-fast-deep-equal:
-  license: "MIT"
-fast-equals:
-  license: "MIT"
-json-schema-traverse:
-  license: "MIT"
-just-clone:
-  license: "MIT"
-konva:
-  license: "MIT"
-linkify-it:
-  license: "MIT"
-markdown-it:
-  license: "MIT"
-match-all:
-  license: "MIT"
-mdurl:
-  license: "MIT"
-ms:
-  license: "MIT"
-nanoid:
-  license: "MIT"
-picocolors:
-  license: "ISC"
-postcss:
-  license: "MIT"
-property-expr:
-  license: "MIT"
-punycode:
-  license: "MIT"
-register-service-worker:
-  license: "MIT"
-require-from-string:
-  license: "MIT"
-roboto-fontface:
-  license: "Apache-2.0"
-sortablejs:
-  license: "MIT"
-source-map:
-  license: "BSD-3-Clause"
-source-map-js:
-  license: "BSD-3-Clause"
-ucmicro:
-  license: "MIT"
-uri-js:
-  license: "BSD-2-Clause"
-vue:
-  license: "MIT"
-vue-class-component:
-  license: "MIT"
-vue-property-decorator:
-  license: "MIT"
-vue-router:
-  license: "MIT"
-vuedraggable:
-  license: "MIT"
-vuetify:
-  license: "MIT"
-vuex:
-  license: "MIT"
 
 everest-cmake:
   description: "CMake utility scripts for everest"
@@ -125,10 +30,6 @@ ext-mbedtls:
   name: "Mbed TLS"
   description: "An open source, portable, easy to use, readable and flexible SSL library"
   license: "Apache-2.0"
-ext-openv2g:
-  name: "OpenV2G"
-  description: "An open source project implementing the basic functionality of the ISO IEC 15118 vehicle to grid (V2G) communication interface"
-  license: "LGPL-3.0+"
 boost:
   description: "Boost provides free peer-reviewed portable C++ source libraries."
   license: "BSL-1.0 & MIT & Python-2.0"
@@ -138,9 +39,27 @@ pugixml:
 Josev:
   description: "Implementation of the ISO 15118 Communication Protocol (-2, -20, -8)"
   license: "Apache-2.0"
-RISE-V2G:
-  description: "The only fully-featured reference implementation of the Vehicle-2-Grid communication interface ISO 15118"
+sqlite_cpp:
+  name: "SQLiteCpp"
+  description: "SQLiteC++ (SQLiteCpp) is a smart and easy to use C++ SQLite3 wrapper"
   license: "MIT"
+libcurl:
+  name: "curl"
+  description: "A command line tool and library for transferring data with URL syntax, supporting DICT, FILE, FTP, FTPS, GOPHER, GOPHERS, HTTP, HTTPS, IMAP, IMAPS, LDAP, LDAPS, MQTT, POP3, POP3S, RTMP, RTMPS, RTSP, SCP, SFTP, SMB, SMBS, SMTP, SMTPS, TELNET, TFTP, WS and WSS. libcurl offers a myriad of powerful features"
+  license: "curl"
+libcbv2g:
+  name: "libcbV2G"
+  description: "libcbV2G - The V2GTP EXI codec library"
+  license: "Apache-2.0"
+everest-utils:
+  description: "EVerest utilities"
+  license: "Apache-2.0"
+libpcap:
+  license: "BSD-3-Clause"
+libevent:
+  license: "BSD-3-Clause & MIT"
+openssl:
+  license: "Apache-2.0"
 
 # from everest-dev-environment
 edm:
@@ -201,6 +120,12 @@ ryml:
   name: "Rapid YAML"
   description: "Rapid YAML - a library to parse and emit YAML, and do it fast."
   license: "MIT"
+libcap:
+  license: "BSD-3-Clause"
+node-addon-api:
+  license: "MIT"
+nodejs:
+  license: "MIT & ISC & BSD-2-Clause & BSD-3-Clause & Artistic-2.0 & Apache-2.0"
 
 # from everest-utils
 ev-dev-tools:
@@ -282,6 +207,9 @@ websocketpp:
   name: "WebSocket++"
   description: "C++ websocket client/server library"
   license: "BSD-3-Clause"
+libevse-security:
+  description: "This is a C++ library for security related operations for charging stations"
+  license: "Apache-2.0"
 
 libslac:
   description: "Simple ISO15118-3 SLAC library"
@@ -290,18 +218,6 @@ libslac:
 hash-library:
   description: "Portable C++ hashing library"
   license: "Zlib"
-
-libsunspec:
-  description: "This is an implementation of SunSpec for utilization within EVerest"
-  license: "Apache-2.0"
-# dependencies of libsunspec
-inih:
-  name: "inih (INI Not Invented Here)"
-  description: "Simple .INI file parser in C, good for embedded systems "
-  license: "BSD-3-Clause"
-sunspec-models:
-  description: "SunSpec Model Definitions"
-  license: "Apache-2.0"
 
 libtimer:
   description: "C++ timer library for the EVerest framework"

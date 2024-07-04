@@ -1305,7 +1305,8 @@ def release_handler(args):
     if everest_core_repo_info["tag"]:
         everest_core_repo_info_git_tag = everest_core_repo_info["tag"]
     snapshot_yaml = {"everest-core": {"git_tag": everest_core_repo_info_git_tag}}
-    for cpm_module_file in sorted(cpm_modules_path.glob("*/")):
+    for cpm_module_file_name in sorted(os.listdir(cpm_modules_path)):
+        cpm_module_file = cpm_modules_path / cpm_module_file_name
         if not cpm_module_file.is_file():
             continue
         with open(cpm_module_file, encoding='utf-8', mode='r') as cpm_module:
