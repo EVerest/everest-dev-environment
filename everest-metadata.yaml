@@ -156,6 +156,12 @@ libcbv2g:
 everest-utils:
   description: "EVerest utilities"
   license: "Apache-2.0"
+libpcap:
+  license: "BSD-3-Clause"
+libevent:
+  license: "BSD-3-Clause & MIT"
+openssl:
+  license: "Apache-2.0"
 
 # from everest-dev-environment
 edm:
@@ -216,6 +222,12 @@ ryml:
   name: "Rapid YAML"
   description: "Rapid YAML - a library to parse and emit YAML, and do it fast."
   license: "MIT"
+libcap:
+  license: "BSD-3-Clause"
+node-addon-api:
+  license: "MIT"
+nodejs:
+  license: "MIT & ISC & BSD-2-Clause & BSD-3-Clause & Artistic-2.0 & Apache-2.0"
 
 # from everest-utils
 ev-dev-tools:
