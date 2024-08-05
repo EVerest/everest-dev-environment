@@ -1,0 +1,9 @@
+[project]
+name = "everest_dev_tool"
+version = "0.0.1"
+description = "This tool provides helpfull commands to setup/control your dev environment"
+license = { text="MIT" }
+dependencies = []
+
+[project.scripts]
+everest = "everest_dev_tool:main"

@@ -1,0 +1,48 @@
+networks:
+  docker-proxy-network:
+    internal: true
+
+volumes:
+  cpm-source-cache:
+    name: everest-cpm-source-cache
+
+services:
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - POST=1
+      - NETWORKS=1
+      - VOLUMES=1
+    networks:
+      - docker-proxy-network
+
+  devcontainer:
+    depends_on:
+      - docker-proxy
+    build:
+      context: ./general-devcontainer
+      dockerfile: Dockerfile
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: volume
+        source: cpm-source-cache
+        target: /home/docker/.cache/cpm
+    command: sleep infinity
+    environment:
+      MQTT_SERVER_ADDRESS: mqtt-server
+      MQTT_SERVER_PORT: 1883
+      DOCKER_HOST: tcp://docker-proxy:2375
+      CPM_SOURCE_CACHE: /home/docker/.cache/cpm
+    networks:
+      - docker-proxy-network
+      - default
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
