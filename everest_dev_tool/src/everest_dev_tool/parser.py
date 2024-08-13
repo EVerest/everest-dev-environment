@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from . import services, git_handlers, debug_handlers
+from . import services, git_handlers
 
 log = logging.getLogger("EVerest's Development Tool")
 
