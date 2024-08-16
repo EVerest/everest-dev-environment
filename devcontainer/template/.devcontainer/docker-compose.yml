@@ -1,0 +1,40 @@
+volumes:
+  ocpp-db-data:
+    external: false
+  node-red-data:
+    external: false
+
+services:
+  mqtt-server:
+    image: ghcr.io/everest/everest-dev-environment/mosquitto:v0.7.0
+    ports:
+      # allow multiple ports for host to avoid conflicts with other dev environments
+      - 1883-1983:1883
+      - 9001-9101:9001
+
+  ocpp-db:
+    image: mariadb:10.4.30 # pinned to patch-version because https://github.com/steve-community/steve/pull/1213
+    volumes:
+      - ocpp-db-data:/var/lib/mysql
+    ports:
+      # allow multiple ports for host to avoid conflicts with other dev environments
+      - 13306-13406:3306
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: ocpp-db
+      MYSQL_USER: ocpp
+      MYSQL_PASSWORD: ocpp
+  steve:
+    image: ghcr.io/everest/everest-dev-environment/steve:v0.7.0
+    ports:
+      # allow multiple ports for host to avoid conflicts with other dev environments
+      - 8180-8280:8180
+      - 8443-8543:8443
+    depends_on:
+      - ocpp-db
+  mqtt-explorer:
+    image: ghcr.io/everest/everest-dev-environment/mqtt-explorer:v0.7.0
+    depends_on:
+      - mqtt-server
+    ports:
+      - 4000-4100:4000
