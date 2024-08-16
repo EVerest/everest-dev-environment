@@ -28,7 +28,7 @@ if [ "$(ls -A $WORKSPACE_DIR)" ]; then
     fi
 fi
 
-TMP_DIR="$WORKSPACE_DIR/tmp-everest-dev-environment"
+TMP_DIR=$(mktemp --directory)
 echo "Clone the everest-dev-environment repository to the workspace directory with the version $VERSION, temporarily.."
 git clone --quiet --depth 1 --single-branch --branch "$VERSION" https://github.com/EVerest/everest-dev-environment.git "$TMP_DIR"
 
