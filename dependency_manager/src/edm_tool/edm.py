@@ -790,13 +790,15 @@ class EDM:
     @classmethod
     def check_github_key(cls) -> bool:
         """Checks if a public key is stored at github."""
-        valid = False
+        valid = True
         try:
             subprocess.run(["ssh", "-T", "git@github.com"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        except subprocess.TimeoutExpired:
+            valid = False
         except subprocess.CalledProcessError as process_error:
             if process_error.returncode == 1:
-                valid = True
+                valid = False
 
         return valid
 
