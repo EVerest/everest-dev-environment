@@ -6,7 +6,7 @@ volumes:
 
 services:
   mqtt-server:
-    image: ghcr.io/everest/everest-dev-environment/mosquitto:v0.7.0
+    image: ghcr.io/everest/everest-dev-environment/mosquitto:docker-images-v0.1.0
     ports:
       # allow multiple ports for host to avoid conflicts with other dev environments
       - 1883-1983:1883
@@ -25,7 +25,7 @@ services:
       MYSQL_USER: ocpp
       MYSQL_PASSWORD: ocpp
   steve:
-    image: ghcr.io/everest/everest-dev-environment/steve:v0.7.0
+    image: ghcr.io/everest/everest-dev-environment/steve:docker-images-v0.1.0
     ports:
       # allow multiple ports for host to avoid conflicts with other dev environments
       - 8180-8280:8180
@@ -33,7 +33,7 @@ services:
     depends_on:
       - ocpp-db
   mqtt-explorer:
-    image: ghcr.io/everest/everest-dev-environment/mqtt-explorer:v0.7.0
+    image: ghcr.io/everest/everest-dev-environment/mqtt-explorer:docker-images-v0.1.0
     depends_on:
       - mqtt-server
     ports:
