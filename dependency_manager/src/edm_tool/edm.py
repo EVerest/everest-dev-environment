@@ -411,10 +411,22 @@ class GitInfo:
         """
         Return useful information about a repository a the given path.
 
-        TODO: return type should be a well defined object
-        Returns an empty dictionary if the path is no git repo
+        Returns a default dictionary if the path is no git repo
         """
-        repo_info = {'is_repo': False}
+        repo_info = {
+            'is_repo': False,
+            'fetch_worked': None,
+            'remote_branch': None,
+            'behind': None,
+            'ahead': None,
+            'tag': None,
+            'branch': None,
+            'dirty': None,
+            'detached': None,
+            'rev': None,
+            'short_rev': None,
+            'url': None,
+        }
         if GitInfo.is_repo(repo_path):
             repo_info["is_repo"] = True
             if fetch:
@@ -1628,9 +1640,9 @@ def get_parser(version) -> argparse.ArgumentParser:
         type=str,
         action="append",
         help="Bazel-style label for the build files into the deppendencies. " +
-             "The format should be `@<workspace>//<path>:BUILD.<dependency-name>.bazel`." + 
+             "The format should be `@<workspace>//<path>:BUILD.<dependency-name>.bazel`." +
              "<dependency-name> should correspond to the name of the dependency in " +
-             "the dependencies.yaml file. This option can be used multiple times." + 
+             "the dependencies.yaml file. This option can be used multiple times." +
              "If not provided, Bazel will search for BUILD file in the repo itself.",
         required=False)
 
