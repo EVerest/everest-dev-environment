@@ -14,4 +14,17 @@ COPY main.properties src/main/resources/config/docker
 COPY init.sh .
 COPY keystore.jks .
 
+ARG TARGETARCH
+COPY entrypoint_wrapper.sh /entrypoint_wrapper.sh
+RUN if [ ${TARGETARCH} != "amd64" ]; then \
+        ln -s /usr/local/bin/mvn-entrypoint.sh /wrapped_entrypoint.sh; \
+        cp /entrypoint_wrapper.sh /entrypoint.sh; \
+    else \
+        ln -s /usr/local/bin/mvn-entrypoint.sh /entrypoint.sh; \
+    fi; \
+    rm /entrypoint_wrapper.sh
+ENTRYPOINT [ "/entrypoint.sh" ]
 CMD /steve/init.sh
+
+
+

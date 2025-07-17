@@ -13,6 +13,7 @@ env:
   DOCKER_DIRECTORY: docker/images
   PLATFORMS: |
     linux/amd64
+    linux/arm64
   PATH_TO_DEPLOY_DOCKER_IMAGES_WORKFLOW: .github/workflows/deploy-docker-images.yml
 
 jobs:
