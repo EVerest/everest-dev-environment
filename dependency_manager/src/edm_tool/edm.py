@@ -298,6 +298,23 @@ class GitInfo:
         return branch
 
     @classmethod
+    def infer_branches(cls, path: Path) -> list:
+        """If in detached HEAD mode, return the likely branches of the repo at path, or an empty list."""
+        branches = []
+        try:
+            result = subprocess.run(["git", "-C", path, "branch", '--format="%(refname:lstrip=0)"', "--remotes", "--no-abbrev", "--contains"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            lines = result.stdout.decode("utf-8").splitlines()
+            for line in lines:
+                branch = line.strip("\"").replace("refs/remotes/origin/", "")
+                if branch != "HEAD":
+                    branches.append(branch)
+        except subprocess.CalledProcessError:
+            return branches
+
+        return branches
+
+    @classmethod
     def get_remote_branch(cls, path: Path) -> str:
         """Return the remote of the current branch of the repo at path, or an empty str."""
         remote_branch = ""
@@ -650,6 +667,21 @@ class EDM:
                 config[path.name] = {}
                 config[path.name]["git"] = info["url"]
             config[path.name]["git_rev"] = info["rev"]
+            if info["branch"] != "":
+                config[path.name]["branch"] = info["branch"]
+            else:
+                branches = GitInfo.infer_branches(path)
+                branch = ""
+                if "main" in branches:
+                    branch = "main"
+                elif "everest" in branches:
+                    branch = "everest"
+                # prefer release branches over main
+                release_branches = [item for item in branches if item.startswith("release/")]
+                if len(release_branches) > 0:
+                    release_branches.sort(reverse=True)
+                    branch = release_branches[0]
+                config[path.name]["branch"] = branch
             if info["tag"]:
                 config[path.name]["git_tag"] = info["tag"]
         return config
