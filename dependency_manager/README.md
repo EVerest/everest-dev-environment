@@ -9,6 +9,7 @@
   - [Setting up a workspace](#setting-up-a-workspace)
   - [Updating a workspace](#updating-a-workspace)
   - [Using the EDM CMake module and dependencies.yaml](#using-the-edm-cmake-module-and-dependenciesyaml)
+  - [Modifying dependencies](#modifying-dependencies)
   - [Create a workspace config from an existing directory tree](#create-a-workspace-config-from-an-existing-directory-tree)
   - [Git information at a glance](#git-information-at-a-glance)
 
@@ -120,6 +121,15 @@ catch2:
 
 ```
 Here *cmake_condition* can be any string that CMake can use in an if() block. Please be aware that any variables you use here must be defined before a call to *evc_setup_edm()* is made in your CMakeLists.txt
+
+## Modifying dependencies
+
+To change dependency git URLs you can set the *EVEREST_MODIFY_DEPENDENCIES_URLS* environment variable to a string containing prefixes and replacements delimited by whitespace characters.
+For example:
+```bash
+EVEREST_MODIFY_DEPENDENCIES_URLS="prefix=git@github.com:EVerest/ replace=https://github.com/EVerest/"
+```
+This would change all dependency git URLs that start with *git@github.com:EVerest/* to *https://github.com/EVerest/*.
 
 Additionally you can set the *EVEREST_MODIFY_DEPENDENCIES* environment variable to a file containing modifications to the projects dependencies.yaml files when running cmake:
 

@@ -1297,6 +1297,26 @@ def modify_dependencies(dependencies, modify_dependencies_file):
         except yaml.YAMLError as e:
             log.error(f"Error parsing yaml of {modify_dependencies_file}: {e}")
 
+
+def modify_dependencies_urls(dependencies, modify_dependencies_input):
+    log.info(f"Modifying dependencies with input: {modify_dependencies_input}")
+
+    dep_match = re.findall(r"\s*prefix=(\S*)\s*replace=(\S*)", modify_dependencies_input, re.MULTILINE)
+
+    if len(dep_match) == 0:
+        log.warning(f"Dependencies modifications could not be parsed, ignoring them.")
+        return
+
+    for _, dependency in dependencies.items():
+        if "git" in dependency:
+            original_dependency_git = dependency["git"]
+            for (source, target) in dep_match:
+                if original_dependency_git.startswith(source):
+                    dependency["git"] = original_dependency_git.replace(
+                        source, target, 1)
+                    log.info(f"Replaced dependency git URL '{original_dependency_git}' with '{dependency['git']}'")
+
+
 def populate_component(metadata_yaml, key, version):
     meta = {"description": "", "license": "unknown", "name": key}
     if key in metadata_yaml:
@@ -1490,7 +1510,14 @@ def main_handler(args):
     workspace = EDM.parse_workspace_directory(workspace_dir)
     checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
 
-    # modify dependencies from environment variable
+    # modify dependencies from environment variables
+
+    # modify dependencies urls
+    env_modify_dependencies_urls = os.environ.get('EVEREST_MODIFY_DEPENDENCIES_URLS')
+    if env_modify_dependencies_urls:
+        modify_dependencies_urls(dependencies, env_modify_dependencies_urls)
+
+    # modify whole dependency entries
     env_modify_dependencies = os.environ.get('EVEREST_MODIFY_DEPENDENCIES')
     if env_modify_dependencies:
         modify_dependencies_file = Path(env_modify_dependencies).expanduser().resolve()
