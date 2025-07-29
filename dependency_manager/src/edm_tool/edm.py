@@ -1510,14 +1510,14 @@ def main_handler(args):
     workspace = EDM.parse_workspace_directory(workspace_dir)
     checkout = EDM.checkout_local_dependencies(workspace, args.workspace, dependencies)
 
-    # modify dependencies from environment variables
+    # Apply modifications from environment variables to the dependencies
 
-    # modify dependencies urls
+    # Apply URL modifications to the dependencies
     env_modify_dependencies_urls = os.environ.get('EVEREST_MODIFY_DEPENDENCIES_URLS')
     if env_modify_dependencies_urls:
         modify_dependencies_urls(dependencies, env_modify_dependencies_urls)
 
-    # modify whole dependency entries
+    # Apply modifications of whole dependency entries, comming from an additional file
     env_modify_dependencies = os.environ.get('EVEREST_MODIFY_DEPENDENCIES')
     if env_modify_dependencies:
         modify_dependencies_file = Path(env_modify_dependencies).expanduser().resolve()
