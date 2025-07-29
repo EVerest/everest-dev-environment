@@ -127,16 +127,16 @@ Here *cmake_condition* can be any string that CMake can use in an if() block. Pl
 To change dependency git URLs you can set the *EVEREST_MODIFY_DEPENDENCIES_URLS* environment variable to a string containing prefixes and replacements delimited by whitespace characters.
 For example:
 ```bash
-EVEREST_MODIFY_DEPENDENCIES_URLS="prefix=git@github.com:EVerest/ replace=https://github.com/EVerest/"
+EVEREST_MODIFY_DEPENDENCIES_URLS="prefix=https://github.com/EVerest/ replace=git@github.com:EVerest/"
 ```
-This would change all dependency git URLs that start with *git@github.com:EVerest/* to *https://github.com/EVerest/*.
+This would change all dependency git URLs that start with *https://github.com/EVerest/* to *git@github.com:EVerest/*.
 
 Multiple prefix and replace pairs can be chained together delimited by whitespace characters.
 For example:
 ```bash
-EVEREST_MODIFY_DEPENDENCIES_URLS="prefix=git@github.com:EVerest/ replace=https://github.com/EVerest/ prefix=https://github.com/EVerest/everest-framework.git replace=git@github.com:EVerest/everest-framework.git"
+EVEREST_MODIFY_DEPENDENCIES_URLS="prefix=https://github.com/EVerest/ replace=git@github.com:EVerest/ prefix=https://github.com/EVerest/everest-framework.git replace=https://github.com/EVerest/everest-framework.git"
 ```
-This would change all dependency git URLs that start with *git@github.com:EVerest/* to *https://github.com/EVerest/* as well as change the dependency git URL of *https://github.com/EVerest/everest-framework.git* to *git@github.com:EVerest/everest-framework.git* .
+This would change all dependency git URLs that start with *https://github.com/EVerest/* to *git@github.com:EVerest/* as well as keeping the dependency https URL of *https://github.com/EVerest/everest-framework.git* as *https://github.com/EVerest/everest-framework.git*.
 
 Additionally you can set the *EVEREST_MODIFY_DEPENDENCIES* environment variable to a file containing modifications to the projects dependencies.yaml files when running cmake:
 
