@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 
 from . import services, git_handlers
 
@@ -38,9 +39,10 @@ def get_parser(version: str) -> argparse.ArgumentParser:
     list_services_parser.set_defaults(action_handler=services.list_services_handler)
 
     # Git related commands
+    default_org = os.environ.get("EVEREST_DEFAULT_ORGANIZATION", "EVerest")
     clone_parser = subparsers.add_parser("clone", help="Clone a repository", add_help=True)
     clone_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    clone_parser.add_argument('--organization', '--org', default="EVerest", help="Github Organization name, default is 'EVerest'")
+    clone_parser.add_argument('--organization', '--org', default=default_org, help=f"Git repository organization name, default is {default_org}")
     clone_parser.add_argument('--branch', '-b', default="main", help="Branch to checkout, default is 'main'")
     clone_parser.add_argument('--https', action='store_true', help="Use HTTPS to clone the repository, default is 'SSH'")
     clone_parser.add_argument("repository_name", help="Name of the repository to clone")
