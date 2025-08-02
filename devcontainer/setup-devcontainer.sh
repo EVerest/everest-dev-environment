@@ -120,8 +120,8 @@ echo "Copy the template devcontainer configuration files to the workspace direct
 cp -n -r $TMP_DIR/devcontainer/template/. $WORKSPACE_DIR/
 
 # Replace placeholders in docker-compose.devcontainer.yml
-sed -i "s|ORGANIZATION_ARG: \"REPLACE_ORG\"|ORGANIZATION_ARG: \"$ORG\"|" $WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml
-sed -i "s|REPOSITORY_URL_ARG: \"REPLACE_URL\"|REPOSITORY_URL_ARG: \"$REPO\"|" $WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml
+sed -i "s|ORGANIZATION_ARG: \"REPLACE_ORG\"|ORGANIZATION_ARG: \"${ORG}\"|" "$WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml"
+sed -i "s|REPOSITORY_URL_ARG: \"REPLACE_URL\"|REPOSITORY_URL_ARG: \"${REPO}\"|" "$WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml"
 
 echo "Remove the temporary clone of the $REPO_NAME repository"
 rm -rf "$TMP_DIR"

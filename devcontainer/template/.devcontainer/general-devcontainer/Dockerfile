@@ -7,7 +7,8 @@ RUN sudo apt update
 # Modify the existing docker user and group to match the host's UID and GID
 ARG UID=1000
 ARG GID=1000
-RUN sudo groupmod --gid ${GID} docker &&     sudo usermod --uid ${UID} --gid ${GID} docker
+RUN groupmod --gid ${GID} docker && \
+    usermod --uid ${UID} --gid ${GID} docker
 
 # Switch to the new user
 USER docker
