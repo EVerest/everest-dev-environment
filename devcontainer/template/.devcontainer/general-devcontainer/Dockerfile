@@ -18,7 +18,10 @@ WORKDIR /home/docker
 RUN pip install --break-system-packages \
     docker==7.1.0
 # EVerest Development Tool
-ARG DEV_ENV_TOOL_VERSION=docker-images-v0.1.0
+ARG DEV_ENV_TOOL_VERSION=feature/support_different_repo_org
+# Get the latest commit hash from the specific branch/tag to bust cache when repository changes
+RUN git ls-remote https://github.com/EVerest/everest-dev-environment.git ${DEV_ENV_TOOL_VERSION} | cut -f1 > /tmp/latest_commit.txt
+ARG CACHE_BUST=$(cat /tmp/latest_commit.txt)
 RUN python3 -m pip install --break-system-packages \
     git+https://github.com/EVerest/everest-dev-environment@${DEV_ENV_TOOL_VERSION}#subdirectory=everest_dev_tool
 
