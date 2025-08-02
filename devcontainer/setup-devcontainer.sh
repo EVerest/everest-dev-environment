@@ -22,7 +22,7 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  $0"
-    echo "  $0 -w /path/to/workspace -v v1.0.0"
+    echo "  $0 -w /path/to/workspace -v release/1.0"
     echo "  $0 --workspace ./my-project --version main --hosting git@github.com --org mycompany"
     exit 0
 }
@@ -68,10 +68,14 @@ if [ $# -eq 0 ]; then
         VERSION="$USER_VERSION"
     fi
 
-    read -p "Are you a customer of Pionix or a Pionix internal developer? (y/N): " -r
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        read -p "Are you using Pionix git (git.pionix.com) or do you have your own hosting (default:${REPO})?: " USER_REPO
-        read -p "What is the organization name you are using (default:${ORG}): " USER_ORG
+    read -p "Are you a customer of Pionix (or a Pionix internal developer)? (Y/n): " -r
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        # Internal developer, override default values
+        ORG="PionixPro"
+        REPO="git@github.com"
+    else
+        read -p "Are you using Pionix hosted git (default:${REPO}) or do you have your own hosting (e.g. like git@github.com)?: " USER_REPO
+        read -p "What is the organization name you are using for the hosted git (default:${ORG}): " USER_ORG
 
         if [ -n "$USER_REPO" ]; then
             REPO="$USER_REPO"
@@ -79,10 +83,6 @@ if [ $# -eq 0 ]; then
         if [ -n "$USER_ORG" ]; then
             ORG="$USER_ORG"
         fi
-    else
-        # Internal developer, override default values
-        ORG="PionixPro"
-        REPO="git@github.com"
     fi
 fi
 
@@ -114,8 +114,7 @@ else
 fi
 
 echo "Clone $REPO_NAME repository ($CLONE_URL) to the workspace directory with the version $VERSION, temporarily.."
-    git clone --quiet --depth 1 --single-branch --branch "$VERSION" "$CLONE_URL" "$TMP_DIR"
-fi
+git clone --quiet --depth 1 --single-branch --branch "$VERSION" "$CLONE_URL" "$TMP_DIR"
 
 echo "Copy the template devcontainer configuration files to the workspace directory"
 cp -n -r $TMP_DIR/devcontainer/template/. $WORKSPACE_DIR/
