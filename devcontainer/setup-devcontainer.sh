@@ -119,9 +119,20 @@ git clone --quiet --depth 1 --single-branch --branch "$VERSION" "$CLONE_URL" "$T
 echo "Copy the template devcontainer configuration files to the workspace directory"
 cp -n -r $TMP_DIR/devcontainer/template/. $WORKSPACE_DIR/
 
+# Get the latest commit hash from the everest-dev-environment repository
+echo "Getting the latest commit hash from everest-dev-environment repository..."
+COMMIT_HASH=$(git ls-remote https://github.com/EVerest/everest-dev-environment.git ${DEV_ENV_TOOL_VERSION} | cut -f1)
+if [ -z "$COMMIT_HASH" ]; then
+    echo "Warning: Could not get commit hash from everest-dev-environment repository. Using empty value."
+    COMMIT_HASH=""
+else
+    echo "Latest commit hash: $COMMIT_HASH"
+fi
+
 # Replace placeholders in docker-compose.devcontainer.yml
 sed -i "s|ORGANIZATION_ARG: \"REPLACE_ORG\"|ORGANIZATION_ARG: \"${ORG}\"|" "$WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml"
 sed -i "s|REPOSITORY_URL_ARG: \"REPLACE_URL\"|REPOSITORY_URL_ARG: \"${REPO}\"|" "$WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml"
+sed -i "s|COMMIT_HASH: \${COMMIT_HASH:-}|COMMIT_HASH: \"${COMMIT_HASH}\"|" "$WORKSPACE_DIR/.devcontainer/general-devcontainer/docker-compose.devcontainer.yml"
 
 echo "Remove the temporary clone of the $REPO_NAME repository"
 rm -rf "$TMP_DIR"

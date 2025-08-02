@@ -33,6 +33,7 @@ services:
         GID: ${GID:-1000}
         ORGANIZATION_ARG: "REPLACE_ORG"
         REPOSITORY_URL_ARG: "REPLACE_URL"
+        COMMIT_HASH: ${COMMIT_HASH:-}
     volumes:
       - type: bind
         source: ..
