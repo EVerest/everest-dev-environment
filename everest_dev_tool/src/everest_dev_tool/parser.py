@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 
 from . import services, git_handlers
 
@@ -40,9 +41,38 @@ def get_parser(version: str) -> argparse.ArgumentParser:
     # Git related commands
     clone_parser = subparsers.add_parser("clone", help="Clone a repository", add_help=True)
     clone_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    clone_parser.add_argument('--organization', '--org', default="EVerest", help="Github Organization name, default is 'EVerest'")
+    default_git_forge = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_FORGE", "github.com")
+    clone_parser.add_argument(
+        '--forge',
+        default=default_git_forge,
+        help=(
+            "Git forge to use, default is 'github.com' "
+            "(can be overridden by the environment variable "
+            "EVEREST_DEV_TOOL_DEFAULT_GIT_FORGE)"
+        ),
+    )
+    default_git_method = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_METHOD", "ssh")
+    clone_parser.add_argument(
+        '--method',
+        default=default_git_method,
+        choices=['https', 'ssh'],
+        help=(
+            "Git method to use, default is 'ssh' "
+            "(can be overridden by the environment variable "
+            "EVEREST_DEV_TOOL_DEFAULT_GIT_METHOD)"
+        )
+    )
+    default_git_organization = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_ORGANIZATION", "EVerest")
+    clone_parser.add_argument(
+        '--organization', '--org',
+        default=default_git_organization,
+        help=(
+            "Github Organization name, default is 'EVerest'"
+            " (can be overridden by the environment variable "
+            "EVEREST_DEV_TOOL_DEFAULT_GIT_ORGANIZATION)"
+        )
+    )
     clone_parser.add_argument('--branch', '-b', default="main", help="Branch to checkout, default is 'main'")
-    clone_parser.add_argument('--https', action='store_true', help="Use HTTPS to clone the repository, default is 'SSH'")
     clone_parser.add_argument("repository_name", help="Name of the repository to clone")
     clone_parser.set_defaults(action_handler=git_handlers.clone_handler)
 
