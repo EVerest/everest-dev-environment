@@ -41,14 +41,14 @@ def get_parser(version: str) -> argparse.ArgumentParser:
     # Git related commands
     clone_parser = subparsers.add_parser("clone", help="Clone a repository", add_help=True)
     clone_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    default_git_forge = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_FORGE", "github.com")
+    default_git_host = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_HOST", "github.com")
     clone_parser.add_argument(
-        '--forge',
-        default=default_git_forge,
+        '--host',
+        default=default_git_host,
         help=(
-            "Git forge to use, default is 'github.com' "
+            "Git host to use, default is 'github.com' "
             "(can be overridden by the environment variable "
-            "EVEREST_DEV_TOOL_DEFAULT_GIT_FORGE)"
+            "EVEREST_DEV_TOOL_DEFAULT_GIT_HOST)"
         ),
     )
     default_git_method = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_METHOD", "ssh")
@@ -60,6 +60,16 @@ def get_parser(version: str) -> argparse.ArgumentParser:
             "Git method to use, default is 'ssh' "
             "(can be overridden by the environment variable "
             "EVEREST_DEV_TOOL_DEFAULT_GIT_METHOD)"
+        )
+    )
+    default_git_ssh_user = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_SSH_USER", "git")
+    clone_parser.add_argument(
+        '--ssh-user',
+        default=default_git_ssh_user,
+        help=(
+            "SSH user to use, default is 'git' "
+            "(can be overridden by the environment variable "
+            "EVEREST_DEV_TOOL_DEFAULT_GIT_SSH_USER)"
         )
     )
     default_git_organization = os.environ.get("EVEREST_DEV_TOOL_DEFAULT_GIT_ORGANIZATION", "EVerest")

@@ -1,8 +1,5 @@
 import argparse
-import logging
 import subprocess
-
-default_logger = logging.getLogger("EVerest's Development Tool - Git Helpers")
 
 def clone_handler(args: argparse.Namespace):
     log = args.logger
@@ -10,16 +7,17 @@ def clone_handler(args: argparse.Namespace):
     log.info(
         f"Cloning repository:\n"
         f"  Method: {args.method}\n"
-        f"  Forge: {args.forge}\n"
+        f"  Host: {args.host}\n"
+        f"  SSH User (if ssh): {args.ssh_user}\n"
         f"  Organization: {args.organization}\n"
         f"  Repository Name: {args.repository_name}\n"
         f"  Branch: {args.branch}\n"
     )
     repository_url = ""
     if args.method == 'https':
-        repository_url = f"https://{args.forge}/"
+        repository_url = f"https://{args.host}/"
     else:
-        repository_url = f"git@{args.forge}:"
+        repository_url = f"{args.ssh_user}@{args.host}:"
     repository_url = repository_url + f"{ args.organization }/{ args.repository_name }.git"
 
     cmd_args = ["git", "clone", "-b", args.branch, repository_url]
