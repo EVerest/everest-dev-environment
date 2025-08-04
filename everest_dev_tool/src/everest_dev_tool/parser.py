@@ -73,6 +73,7 @@ def get_parser(version: str) -> argparse.ArgumentParser:
         )
     )
     clone_parser.add_argument('--branch', '-b', default="main", help="Branch to checkout, default is 'main'")
+    clone_parser.add_argument('--dry', action='store_true', help="Dry run, do not execute the clone command")
     clone_parser.add_argument("repository_name", help="Name of the repository to clone")
     clone_parser.set_defaults(action_handler=git_handlers.clone_handler)
 
