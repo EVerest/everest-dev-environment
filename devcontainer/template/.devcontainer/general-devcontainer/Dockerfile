@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ghcr.io/everest/everest-ci/dev-env-base:v1.3.2
+FROM ghcr.io/everest/everest-ci/dev-env-base:v1.5.4
 
 # Update the package list
 RUN sudo apt update
