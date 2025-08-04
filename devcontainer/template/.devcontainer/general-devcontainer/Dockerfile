@@ -8,7 +8,7 @@ RUN sudo apt update
 RUN pip install --break-system-packages \
     docker==7.1.0
 # EVerest Development Tool
-ARG DEV_ENV_TOOL_VERSION=docker-images-v0.1.0
+ARG DEV_ENV_TOOL_VERSION=everest-dev-tool-v0.1.0
 RUN python3 -m pip install --break-system-packages \
     git+https://github.com/EVerest/everest-dev-environment@${DEV_ENV_TOOL_VERSION}#subdirectory=everest_dev_tool
 
