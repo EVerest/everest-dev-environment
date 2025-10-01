@@ -8,17 +8,15 @@ services:
   mqtt-server:
     image: ghcr.io/everest/everest-dev-environment/mosquitto:docker-images-v0.2.0
     ports:
-      # allow multiple ports for host to avoid conflicts with other dev environments
-      - 1883-1983:1883
-      - 9001-9101:9001
+      - 1883:1883
+      - 9001:9001
 
   ocpp-db:
     image: mariadb:10.4.30 # pinned to patch-version because https://github.com/steve-community/steve/pull/1213
     volumes:
       - ocpp-db-data:/var/lib/mysql
     ports:
-      # allow multiple ports for host to avoid conflicts with other dev environments
-      - 13306-13406:3306
+      - 13306:3306
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
       MYSQL_DATABASE: ocpp-db
@@ -27,14 +25,33 @@ services:
   steve:
     image: ghcr.io/everest/everest-dev-environment/steve:docker-images-v0.2.0
     ports:
-      # allow multiple ports for host to avoid conflicts with other dev environments
-      - 8180-8280:8180
-      - 8443-8543:8443
+      - 8180:8180
+      - 8443:8443
     depends_on:
       - ocpp-db
   mqtt-explorer:
-    image: ghcr.io/everest/everest-dev-environment/mqtt-explorer:docker-images-v0.2.0
+    image: ghcr.io/everest/everest-dev-environment/mqtt-explorer:docker-images-v0.1.0
     depends_on:
       - mqtt-server
     ports:
-      - 4000-4100:4000
+      - 4000:4000
+  nodered:
+    image: ghcr.io/everest/everest-dev-environment/nodered:docker-images-v0.1.0
+    ports:
+      - 1881:1880
+    volumes:
+      - node-red-data:/data
+      - ./nodered-settings.js:/data/settings.js
+      - ./init-nodered-flows.sh:/init-nodered-flows.sh
+    environment:
+      - NODE_RED_ENABLE_PROJECTS=false
+      - MQTT_BROKER=mqtt-server
+      - MQTT_PORT=1883
+      - NODE_RED_HOME=/usr/src/node-red
+      - FLOWS=/data/flows.json
+      - USERDIR=/data
+    entrypoint: >
+      sh -c "
+        /init-nodered-flows.sh &&
+        node-red --userDir=/data
+      "

@@ -1,0 +1,806 @@
+#!/bin/bash
+
+set -e
+
+# Default values
+ORG="EVerest"
+REPO="git@github.com"
+EVEREST_TOOL_BRANCH="main"
+
+WORKSPACE_FOLDER=""
+
+# Docker Compose project name (defaults to current folder name with _devcontainer suffix, can be overridden)
+# This matches VSC's naming convention: {workspace-folder-name}_devcontainer-{service-name}-1
+DOCKER_COMPOSE_PROJECT_NAME="${DOCKER_COMPOSE_PROJECT_NAME:-$(basename "$(pwd)")_devcontainer}"
+
+# Function to run docker compose with static project name
+docker_compose() {
+    docker compose -p "$DOCKER_COMPOSE_PROJECT_NAME" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml "$@"
+}
+
+# Function to validate folder path
+validate_folder() {
+    local folder="$1"
+
+    # Convert relative path to absolute
+    if [[ "$folder" != /* ]]; then
+        folder="$(cd "$folder" && pwd)"
+    fi
+
+    # Check if folder exists
+    if [ ! -d "$folder" ]; then
+        echo "❌ Error: Folder '$folder' does not exist"
+        exit 1
+    fi
+
+    # Check if folder is readable
+    if [ ! -r "$folder" ]; then
+        echo "❌ Error: Folder '$folder' is not accessible (permission denied)"
+        exit 1
+    fi
+
+    echo "$folder"
+}
+
+# Function to detect git repository information
+detect_git_info() {
+    # Check if we're in a git repository using git command
+    local git_root
+    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$git_root" ]; then
+        return 1
+    fi
+
+    # Get the current branch
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$current_branch" ]; then
+        return 1
+    fi
+
+    # Get the remote URL
+    local remote_url
+    remote_url=$(git remote get-url origin 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$remote_url" ]; then
+        return 1
+    fi
+
+    # Parse the remote URL to extract organization and repository
+    local org repo
+
+    # Handle SSH format: user@host:org/repo.git or ssh://user@host:org/repo.git
+    if [[ "$remote_url" =~ ^ssh://([^@]+@[^/]+)/([^/]+)/([^/]+)\.git$ ]] || [[ "$remote_url" =~ ^([^@]+@[^:]+):([^/]+)/([^/]+)\.git$ ]]; then
+        # Save the original values before nested regex
+        local ssh_url="${BASH_REMATCH[1]}"
+        local original_org="${BASH_REMATCH[2]}"
+        local original_repo_name="${BASH_REMATCH[3]}"
+
+        # Extract host and user from SSH URL
+        if [[ "$ssh_url" =~ ([^@]+)@([^@]+) ]]; then
+            repo_user="${BASH_REMATCH[1]}"
+            repo_host="${BASH_REMATCH[2]}"
+        else
+            repo_user="git"
+            repo_host="$ssh_url"
+        fi
+        org="$original_org"
+        repo="$remote_url"
+        # Extract repo name without .git
+        local repo_name="$original_repo_name"
+    # Handle HTTPS format: https://github.com/org/repo.git
+    elif [[ "$remote_url" =~ https://([^/]+)/([^/]+)/([^/]+)\.git ]]; then
+        repo="https://${BASH_REMATCH[1]}"
+        org="${BASH_REMATCH[2]}"
+        # Extract repo name without .git
+        local repo_name="${BASH_REMATCH[3]}"
+    else
+        return 1
+    fi
+
+    # Set the detected values
+    REPO="$repo"
+    ORG="$org"
+    # Note: EVEREST_TOOL_BRANCH is not auto-detected, kept as default
+
+    echo "Detected git repository information:"
+    echo "  Organization: $ORG"
+    echo "  Repository URL: $REPO"
+    echo "  Tool Branch: $EVEREST_TOOL_BRANCH (default)"
+    echo ""
+
+    return 0
+}
+
+# Function to generate .env file
+generate_env() {
+    # Check if this is called from env command (with options) or build/start command
+    local is_env_command=false
+    if [ ${#ENV_OPTIONS[@]} -gt 0 ]; then
+        is_env_command=true
+    fi
+
+    # Process env-specific options if provided
+    local manual_options_provided=false
+
+    if [ ${#ENV_OPTIONS[@]} -gt 0 ]; then
+        local i=0
+        while [ $i -lt ${#ENV_OPTIONS[@]} ]; do
+            case "${ENV_OPTIONS[$i]}" in
+
+                -v|--version)
+                    EVEREST_TOOL_BRANCH="${ENV_OPTIONS[$((i+1))]}"
+                    manual_options_provided=true
+                    ;;
+                -h|--hosting)
+                    REPO="${ENV_OPTIONS[$((i+1))]}"
+                    manual_options_provided=true
+                    ;;
+                -w|--workspace)
+                    WORKSPACE_FOLDER="${ENV_OPTIONS[$((i+1))]}"
+                    manual_options_provided=true
+                    ;;
+                # -o|--org option removed - organization is now extracted from hosting URL
+            esac
+            i=$((i+2))
+        done
+    fi
+
+    # Process workspace folder mapping
+    if [ -n "$WORKSPACE_FOLDER" ]; then
+        echo "Validating workspace folder mapping..."
+        WORKSPACE_FOLDER=$(validate_folder "$WORKSPACE_FOLDER")
+        echo "✅ Workspace folder: $WORKSPACE_FOLDER"
+    else
+        # Default: parent of .devcontainer directory
+        WORKSPACE_FOLDER="$(pwd)"
+        echo "📁 Using default workspace folder: $WORKSPACE_FOLDER"
+    fi
+
+    # Initialize default repository host and user
+    repo_host="github.com"
+    repo_user="git"
+
+    # Only auto-detect if no manual options were provided
+    if [ "$manual_options_provided" = false ]; then
+        if detect_git_info; then
+            echo "Using detected git repository information."
+        else
+            echo "Could not detect git repository information using default values."
+            echo "You can edit the .env file manually to set the values."
+        fi
+    else
+        echo "Using manually specified options (overriding auto-detection)."
+    fi
+
+    # Get the latest commit hash from the everest-dev-environment repository
+    echo "Getting the latest commit hash from everest-dev-environment repository..."
+    COMMIT_HASH=$(git ls-remote https://github.com/EVerest/everest-dev-environment.git ${EVEREST_TOOL_BRANCH} | cut -f1)
+    if [ -z "$COMMIT_HASH" ]; then
+        echo "Warning: Could not get commit hash from everest-dev-environment repository. Using empty value."
+        echo "Warning: Since we can't get the latest commit hash, we can't detect changes in the devcontainer tools."
+        COMMIT_HASH=""
+    else
+        echo "Latest commit hash: $COMMIT_HASH"
+    fi
+
+    # Generate .env file
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    ENV_FILE="$SCRIPT_DIR/.devcontainer/.env"
+
+        # Check if .env file exists and has meaningful content (not just whitespace)
+    if [ -f "$ENV_FILE" ] && [ -s "$ENV_FILE" ] && [ -n "$(grep -v '^[[:space:]]*$' "$ENV_FILE")" ]; then
+        # File exists and is not empty
+        if [ "$is_env_command" = true ]; then
+            # Called from env command - handle options
+            if [ "$manual_options_provided" = true ]; then
+                echo "Found existing .env file. Updating specified command line options..."
+
+                # Update only the variables that were specified via command line
+                if [ -n "$EVEREST_TOOL_BRANCH" ]; then
+                    sed -i "s|^EVEREST_TOOL_BRANCH=.*|EVEREST_TOOL_BRANCH=$EVEREST_TOOL_BRANCH|" "$ENV_FILE"
+                fi
+                if [ -n "$REPO" ]; then
+                    # Extract host, user, and organization from REPO if it's a full URL
+                    if [[ "$REPO" =~ ([^@]+)@([^:]+):([^/]+)/([^/]+)\.git ]]; then
+                        local repo_user="${BASH_REMATCH[1]}"
+                        local repo_host="${BASH_REMATCH[2]}"
+                        local repo_org="${BASH_REMATCH[3]}"
+                        sed -i "s|^REPOSITORY_HOST=.*|REPOSITORY_HOST=$repo_host|" "$ENV_FILE"
+                        sed -i "s|^REPOSITORY_USER=.*|REPOSITORY_USER=$repo_user|" "$ENV_FILE"
+                        sed -i "s|^ORGANIZATION_ARG=.*|ORGANIZATION_ARG=$repo_org|" "$ENV_FILE"
+                    fi
+                fi
+                if [ -n "$WORKSPACE_FOLDER" ]; then
+                    # Check if WORKSPACE_FOLDER already exists in the file
+                    if grep -q "^WORKSPACE_FOLDER=" "$ENV_FILE"; then
+                        sed -i "s|^WORKSPACE_FOLDER=.*|WORKSPACE_FOLDER=$WORKSPACE_FOLDER|" "$ENV_FILE"
+                    else
+                        echo "WORKSPACE_FOLDER=$WORKSPACE_FOLDER" >> "$ENV_FILE"
+                    fi
+                fi
+
+                echo "Updated existing .env file with command line options."
+            else
+                # Called from env command without options - do nothing
+                echo "Found existing .env file. No changes made (use options to update specific values)."
+            fi
+        else
+            # Called from build/start command - do nothing if file exists
+            echo "Found existing .env file. No changes made."
+        fi
+        return
+    fi
+
+    # Generate new .env file
+    echo "Generating new .env file..."
+    echo "# Auto-generated by setup script" > "$ENV_FILE"
+    echo "ORGANIZATION_ARG=$ORG" >> "$ENV_FILE"
+    echo "REPOSITORY_HOST=$repo_host" >> "$ENV_FILE"
+    echo "REPOSITORY_USER=$repo_user" >> "$ENV_FILE"
+    echo "COMMIT_HASH=$COMMIT_HASH" >> "$ENV_FILE"
+    echo "EVEREST_TOOL_BRANCH=$EVEREST_TOOL_BRANCH" >> "$ENV_FILE"
+    echo "UID=$(id -u)" >> "$ENV_FILE"
+    echo "GID=$(id -g)" >> "$ENV_FILE"
+    echo "WORKSPACE_FOLDER=$WORKSPACE_FOLDER" >> "$ENV_FILE"
+
+    echo "Generated .env file with:"
+    echo "  ORGANIZATION_ARG=$ORG"
+    echo "  REPOSITORY_HOST=$repo_host"
+    echo "  REPOSITORY_USER=$repo_user"
+    echo "  COMMIT_HASH=$COMMIT_HASH"
+    echo "  EVEREST_TOOL_BRANCH=$EVEREST_TOOL_BRANCH"
+    echo "  UID=$(id -u)"
+    echo "  GID=$(id -g)"
+    echo "  WORKSPACE_FOLDER=$WORKSPACE_FOLDER"
+    echo ""
+}
+
+# Function to build the container
+build_container() {
+    echo "Building development container..."
+    docker_compose build
+}
+
+# Function to get actual port mapping from docker compose
+get_port_mapping() {
+    local service_name=$1
+    local internal_port=$2
+
+    # Get the actual port mapping from docker compose
+    local port_mapping=$(docker_compose port $service_name $internal_port 2>/dev/null)
+
+    if [ -n "$port_mapping" ]; then
+        # Extract just the host port (remove the host part)
+        echo "$port_mapping" | sed 's/.*://'
+    else
+        echo ""
+    fi
+}
+
+
+
+# Function to display container links
+display_container_links() {
+    echo ""
+    echo "🌐 Container Services Summary:"
+    echo "=============================="
+
+    # Get actual port mappings from docker compose
+    local mqtt_explorer_port=$(get_port_mapping mqtt-explorer 4000)
+    local steve_http_port=$(get_port_mapping steve 8180)
+
+    # Display links with actual ports
+    if [ -n "$mqtt_explorer_port" ]; then
+        echo "📊 MQTT Explorer:    http://localhost:$mqtt_explorer_port"
+    else
+        echo "📊 MQTT Explorer:    http://localhost:4000"
+    fi
+
+    if [ -n "$steve_http_port" ]; then
+        echo "🔌 Steve (HTTP):     http://localhost:$steve_http_port"
+    else
+        echo "🔌 Steve (HTTP):     http://localhost:8180"
+    fi
+
+    # Check if Node-RED is running
+    if docker_compose ps | grep -q "nodered"; then
+        echo "🌐 Node-RED UI:       http://localhost:1881/ui"
+    fi
+
+    echo ""
+    echo "💡 Tips:"
+    echo "  • MQTT Explorer: Browse and debug MQTT topics"
+    echo "  • Steve: OCPP backend management interface"
+    echo "  • Node-RED: Web-based UI for SIL simulations"
+    echo "  • Use './setup prompt' to access the container shell"
+    echo "  • Use './setup nodered-flows' to see available flows"
+    echo ""
+}
+
+# Function to load workspace folder from .env file
+load_workspace_folder() {
+    local env_file=".devcontainer/.env"
+    if [ -f "$env_file" ]; then
+        # Extract WORKSPACE_FOLDER from .env file
+        local workspace_folder=$(grep "^WORKSPACE_FOLDER=" "$env_file" | cut -d'=' -f2-)
+        if [ -n "$workspace_folder" ]; then
+            echo "$workspace_folder"
+        else
+            # Fallback to default
+            echo "$(pwd)"
+        fi
+    else
+        # Fallback to default
+        echo "$(pwd)"
+    fi
+}
+
+# Function to start the container
+start_container() {
+    local container_name="$1"
+
+    if [ -n "$container_name" ]; then
+        echo "Starting container: $container_name..."
+        docker_compose up -d "$container_name"
+
+        # Initialize Node-RED with default flow if nodered was started
+        if [ "$container_name" = "nodered" ] && docker_compose ps | grep -q "nodered"; then
+            echo ""
+            echo "🌐 Initializing Node-RED with default welcome flow..."
+            ./.devcontainer/init-nodered-default.sh
+        fi
+    else
+        echo "Starting development environment..."
+        docker_compose up -d
+
+        # Initialize Node-RED with default flow if it's running
+        if docker_compose ps | grep -q "nodered"; then
+            echo ""
+            echo "🌐 Initializing Node-RED with default welcome flow..."
+            ./.devcontainer/init-nodered-default.sh
+        fi
+
+        echo ""
+        # Display workspace mapping
+        local workspace_folder=$(load_workspace_folder)
+        echo "📁 Workspace mapping: $workspace_folder → /workspace"
+        echo ""
+
+        # Display container links
+        display_container_links
+    fi
+}
+
+# Function to stop the container
+stop_container() {
+    local container_name="$1"
+
+    if [ -n "$container_name" ]; then
+        echo "Stopping container: $container_name..."
+        docker_compose stop "$container_name"
+    else
+        echo "Stopping development environment..."
+        docker_compose down
+    fi
+}
+
+# Function to purge everything
+purge_container() {
+    local purge_pattern="${1:-$(basename "$(pwd)")}"
+    local current_project="$(basename "$(pwd)")"
+    echo "Purging all devcontainer resources for pattern: $purge_pattern..."
+
+    # Only use docker_compose down if purging the current project
+    if [ "$purge_pattern" = "$current_project" ]; then
+        echo "Stopping and removing containers for current project..."
+        docker_compose down -v --remove-orphans
+    else
+        echo "Purging resources for different project pattern: $purge_pattern"
+        echo "Skipping docker-compose cleanup (not current project)"
+    fi
+
+    # Remove all images related to the project
+    echo "Removing devcontainer images..."
+    docker images --format "table {{.Repository}}:{{.Tag}}" | grep -E "($purge_pattern)" | awk '{print $1}' | xargs -r docker rmi -f
+
+    # Remove all volumes related to the project (with force if needed)
+    echo "Removing devcontainer volumes..."
+    docker volume ls --format "{{.Name}}" | grep -E "($purge_pattern)" | while read volume; do
+        echo "Removing volume: $volume"
+        docker volume rm -f "$volume" 2>/dev/null || echo "Volume $volume could not be removed (may be in use)"
+    done
+
+    # Remove any dangling images and containers
+    echo "Cleaning up dangling resources..."
+    docker system prune -f
+
+    echo "Purge complete! All devcontainer resources have been removed."
+}
+
+# Function to check if SSH agent is running
+check_ssh_agent() {
+    if [ -z "$SSH_AUTH_SOCK" ] || ! ssh-add -l >/dev/null 2>&1; then
+        echo "Error: SSH agent is not running or no keys are loaded."
+        echo "Please start the SSH agent and add your keys:"
+        echo "  eval \$(ssh-agent)"
+        echo "  ssh-add ~/.ssh/id_rsa  # or your private key"
+        echo "Or if you're using a different key:"
+        echo "  ssh-add ~/.ssh/your_private_key"
+        exit 1
+    fi
+}
+
+# Function to execute a command in the container
+exec_container() {
+    echo "Checking if development container is running..."
+
+    # Check if the devcontainer service is running
+    if ! docker_compose ps devcontainer | grep -q "Up"; then
+        echo "Error: Development container is not running."
+        echo "Please start the container first with: ./setup start"
+        echo "Or build and start with: ./setup build && ./setup start"
+        exit 1
+    fi
+
+    echo "Executing command in development container..."
+    docker_compose exec devcontainer "$@"
+}
+
+# Function to get a shell prompt in the container
+prompt_container() {
+    echo "Checking if development container is running..."
+
+    # Check if the devcontainer service is running
+    if ! docker_compose ps devcontainer | grep -q "Up"; then
+        echo "Error: Development container is not running."
+        echo "Please start the container first with: ./setup start"
+        echo "Or build and start with: ./setup build && ./setup start"
+        exit 1
+    fi
+
+    echo "Starting shell in development container..."
+    docker_compose exec devcontainer /bin/bash
+}
+
+# Function to list available Node-RED flows
+list_nodered_flows() {
+    echo ""
+    echo "🌐 Available Node-RED Flows:"
+    echo "============================="
+
+    # Check if container is running
+    if ! docker_compose ps | grep -q "nodered"; then
+        echo "❌ Error: Node-RED container is not running"
+        echo "💡 Please start with './setup start' first"
+        return 1
+    fi
+
+    # Find all flow files in both CPM cache and workspace (remove duplicates by basename)
+    local flows_cpm=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
+    local flows_workspace=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
+
+    # Combine and deduplicate flows
+    local flows=$(echo -e "$flows_cpm\n$flows_workspace" | sort | uniq)
+
+    if [ -z "$flows" ]; then
+        echo "❌ No flows found in CPM cache or workspace"
+        echo "💡 Please run 'cmake -B build -S . -GNinja && ninja -C build install/strip' first"
+        echo ""
+        echo "📋 Expected locations:"
+        echo "  /home/docker/.cache/cpm/*/everest-core/config/nodered/*-flow.json"
+        echo "  /workspace/everest-core/config/nodered/*-flow.json"
+        return 1
+    fi
+
+    echo "Found $(echo "$flows" | wc -l) flow(s):"
+    echo ""
+    for flow in $flows; do
+        local name=$(echo "$flow" | sed 's/-flow\.json$//')
+        echo "  📄 $name"
+    done
+    echo ""
+    echo "💡 Usage: ./setup nodered-flow <flow-name>"
+}
+
+# Function to switch Node-RED flow
+switch_nodered_flow() {
+    local flow_name=$1
+
+    if [ -z "$flow_name" ]; then
+        echo "❌ Error: Please specify a flow name"
+        echo ""
+        echo "Available flows:"
+        list_nodered_flows
+        return 1
+    fi
+
+    # Check if container is running
+    if ! docker_compose ps | grep -q "nodered"; then
+        echo "❌ Error: Node-RED container is not running"
+        echo "💡 Please start with './setup start' first"
+        return 1
+    fi
+
+        # Find the flow file in both CPM cache and workspace (handle both full names and short names)
+    local flow_file=""
+
+    # First try the exact name as provided in CPM cache
+    flow_file=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "$flow_name-flow.json" -type f 2>/dev/null | head -1)
+
+    # If not found, try with config-sil- prefix in CPM cache
+    if [ -z "$flow_file" ]; then
+        flow_file=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "config-sil-$flow_name-flow.json" -type f 2>/dev/null | head -1)
+    fi
+
+    # If not found in CPM cache, try workspace
+    if [ -z "$flow_file" ]; then
+        flow_file=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "$flow_name-flow.json" -type f 2>/dev/null | head -1)
+    fi
+
+    # If still not found, try with config-sil- prefix in workspace
+    if [ -z "$flow_file" ]; then
+        flow_file=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "config-sil-$flow_name-flow.json" -type f 2>/dev/null | head -1)
+    fi
+
+    if [ -z "$flow_file" ]; then
+        echo "❌ Error: Flow '$flow_name-flow.json' or 'config-sil-$flow_name-flow.json' not found"
+        echo ""
+        echo "🌐 Available flows in CPM cache and workspace:"
+        local flows_cpm=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
+        local flows_workspace=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
+        echo -e "$flows_cpm\n$flows_workspace" | sort | uniq
+        return 1
+    fi
+
+    echo "🌐 Switching Node-RED to flow: $flow_name"
+    echo "📄 Source: $flow_file"
+
+    # Copy flow to Node-RED volume
+    docker_compose exec -T devcontainer cat "$flow_file" > /tmp/flows.json
+    docker cp /tmp/flows.json ${DOCKER_COMPOSE_PROJECT_NAME}-nodered-1:/data/flows.json
+
+    # Restart Node-RED to load new flow
+    echo "🔄 Restarting Node-RED service..."
+    docker_compose restart nodered
+
+    # Clean up temporary file
+    rm -f /tmp/flows.json
+
+    echo "✅ Node-RED flow switched successfully!"
+    echo "🌐 Access at: http://localhost:1881/ui"
+}
+
+# Function to show Node-RED status
+show_nodered_status() {
+    echo ""
+    echo "🌐 Node-RED Status:"
+    echo "=================="
+
+    # Check if container is running
+    if docker_compose ps | grep -q "nodered"; then
+        echo "✅ Container: Running"
+        echo "🌐 URL: http://localhost:1881/ui"
+    else
+        echo "❌ Container: Not running"
+        echo "💡 Start with './setup start'"
+    fi
+}
+
+# Function to install devcontainer template
+install_devcontainer() {
+    echo "🚀 Installing EVerest DevContainer Template"
+    echo "=========================================="
+
+    read -p "Enter the workspace directory (default is the current directory): " WORKSPACE_DIR
+    if [ -z "$WORKSPACE_DIR" ]; then
+        WORKSPACE_DIR="./"
+    fi
+    WORKSPACE_DIR=$(realpath -m "$WORKSPACE_DIR")
+
+    read -p "Enter the version of the everest-dev-environment (default is 'main'): " VERSION
+    if [ -z "$VERSION" ]; then
+        VERSION="main"
+    fi
+
+    echo "Create the workspace directory '$WORKSPACE_DIR' if it does not exist"
+    mkdir -p $WORKSPACE_DIR
+
+    # Check if workspace directory has files other than everest-dev-environment
+    WORKSPACE_CONTENTS=$(ls -A $WORKSPACE_DIR 2>/dev/null | grep -v "^everest-dev-environment$" || true)
+    if [ -n "$WORKSPACE_CONTENTS" ]; then
+        # The workspace directory is not empty (excluding everest-dev-environment), warning do you want to continue?
+        read -p "The workspace directory is not empty, do you want to continue? (y/N): " -r
+        if [[ $REPLY =~ ^[Nn]$ || $REPLY = "" ]]; then
+            echo "Exiting.."
+            exit 1
+        elif [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Invalid input. Exiting.."
+            exit 1
+        fi
+    fi
+
+    # Check if everest-dev-environment exists locally
+    if [ -d "everest-dev-environment" ]; then
+        echo "Found local everest-dev-environment directory, using it instead of cloning..."
+        SOURCE_DIR="everest-dev-environment"
+    else
+        echo "No local everest-dev-environment found, cloning from GitHub..."
+        TMP_DIR=$(mktemp --directory)
+        git clone --quiet --depth 1 --single-branch --branch "$VERSION" https://github.com/EVerest/everest-dev-environment.git "$TMP_DIR"
+        SOURCE_DIR="$TMP_DIR"
+    fi
+
+    echo "Copy the template devcontainer configuration files to the workspace directory"
+    cp -n -r $SOURCE_DIR/devcontainer/template/. $WORKSPACE_DIR/
+
+    # Only remove temporary directory if we cloned it
+    if [ "$SOURCE_DIR" != "everest-dev-environment" ]; then
+        echo "Remove the temporary everest-dev-environment repository"
+        rm -rf "$SOURCE_DIR"
+    fi
+
+    echo "✅ DevContainer template installation complete!"
+    echo "📁 Files installed to: $WORKSPACE_DIR"
+    echo "💡 Next steps:"
+    echo "   cd $WORKSPACE_DIR"
+    echo "   ./setup env"
+    echo "   ./setup build"
+    echo "   ./setup start"
+}
+
+# Function to display help
+show_help() {
+    echo "Usage: $0 [COMMAND] [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  install                 Install EVerest DevContainer template to a workspace"
+    echo "  env                     Generate .env file with repository information (default)"
+    echo "  build                   Build the development container"
+    echo "  start [container]       Start the development environment or specific container"
+    echo "  stop [container]        Stop the development environment or specific container"
+    echo "  purge [pattern]         Remove all devcontainer resources (containers, images, volumes)"
+    echo "                          Optional pattern to match (default: current folder name)"
+    echo "  exec <command>          Execute a command in the container (requires container to be running)"
+    echo "  prompt                  Get a shell prompt in the container (requires container to be running)"
+    echo "  nodered-flows           List available Node-RED flows"
+    echo "  nodered-flow <name>     Switch Node-RED to specific flow"
+    echo "  nodered-status          Show Node-RED status and current flow"
+    echo ""
+    echo "Options (for env command only):"
+
+    echo "  -v, --version VERSION   Everest tool branch (default: $EVEREST_TOOL_BRANCH, preserves existing if not specified)"
+    echo "  -h, --hosting URL       Git hosting URL (extracts host, user, and organization) (default: $REPO, preserves existing if not specified)"
+    echo "  -w, --workspace DIR     Workspace directory to map to /workspace in container (default: parent of .devcontainer)"
+    echo "  --help                  Display this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0 install              # Install DevContainer template to workspace"
+    echo "  $0                      # Generate .env file"
+    echo "  $0 build                # Build container"
+    echo "  $0 start                # Start all containers"
+    echo "  $0 start nodered        # Start only Node-RED container"
+    echo "  $0 stop                 # Stop all containers"
+    echo "  $0 stop steve           # Stop only Steve container"
+    echo "  $0 purge                # Remove all devcontainer resources for current folder"
+    echo "  $0 purge my-project     # Remove all devcontainer resources matching 'my-project'"
+    echo "  $0 exec ls -la          # Execute command in container"
+    echo "  $0 prompt               # Get shell prompt in container"
+    echo "  $0 nodered-flows        # List available Node-RED flows"
+    echo "  $0 nodered-flow dc      # Switch to DC simulation flow"
+    echo "  $0 nodered-status       # Show Node-RED status"
+
+    echo "  $0 -w ~/Documents                    # Map Documents folder to /workspace"
+    echo "  $0 --workspace /opt/tools            # Map tools folder to /workspace"
+    exit 0
+}
+
+# Parse command line arguments
+COMMAND="env"
+ENV_OPTIONS=()
+
+# First pass: collect all options
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -v|--version|-h|--hosting|-o|--org|-w|--workspace)
+            # Store env-specific options for later use
+            ENV_OPTIONS+=("$1" "$2")
+            shift 2
+            ;;
+        --help)
+            show_help
+            ;;
+        exec)
+            COMMAND="$1"
+            shift
+            # For exec, pass all remaining arguments to the exec function
+            break
+            ;;
+        install|env|build|prompt|nodered-flows|nodered-status)
+            COMMAND="$1"
+            shift
+            # Don't break here, continue to collect more options
+            ;;
+        purge)
+            COMMAND="$1"
+            shift
+            # For purge, pass any remaining arguments as pattern
+            break
+            ;;
+        start|stop)
+            COMMAND="$1"
+            shift
+            # For start/stop, pass any remaining arguments as container name
+            break
+            ;;
+        nodered-flow)
+            COMMAND="$1"
+            shift
+            # For nodered-flow, pass the flow name as argument
+            break
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            ;;
+    esac
+done
+
+# Check SSH agent for all commands (needed for Git operations)
+check_ssh_agent
+
+# Execute the command
+case $COMMAND in
+    install)
+        install_devcontainer
+        ;;
+    env)
+        generate_env
+        ;;
+    build)
+        # Only generate env if .env file doesn't exist or is empty
+        if [ ! -f ".devcontainer/.env" ] || [ ! -s ".devcontainer/.env" ]; then
+            generate_env
+        fi
+        build_container
+        ;;
+    start)
+        # Only generate env if .env file doesn't exist or is empty
+        if [ ! -f ".devcontainer/.env" ] || [ ! -s ".devcontainer/.env" ]; then
+            generate_env
+        fi
+        start_container "$@"
+        ;;
+    stop)
+        stop_container "$@"
+        ;;
+    purge)
+        purge_container "$@"
+        ;;
+    exec)
+        if [ $# -eq 0 ]; then
+            echo "Error: exec command requires arguments"
+            show_help
+        fi
+        exec_container "$@"
+        ;;
+    prompt)
+        prompt_container
+        ;;
+    nodered-flows)
+        list_nodered_flows
+        ;;
+    nodered-flow)
+        if [ $# -eq 0 ]; then
+            echo "Error: nodered-flow command requires a flow name"
+            show_help
+        fi
+        switch_nodered_flow "$1"
+        ;;
+    nodered-status)
+        show_nodered_status
+        ;;
+    *)
+        echo "Unknown command: $COMMAND"
+        show_help
+        ;;
+esac
