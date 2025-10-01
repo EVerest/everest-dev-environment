@@ -76,4 +76,4 @@ ENV EVEREST_DEV_TOOL_DEFAULT_GIT_ORGANIZATION=${ORGANIZATION_ARG}
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # Set up welcome message
-RUN echo "echo \"🚘 Welcome to the Basecamp development environment!\"" >> /home/docker/.bashrc
+RUN echo "echo \"🚘 Welcome to the EVerest development environment!\"" >> /home/docker/.bashrc

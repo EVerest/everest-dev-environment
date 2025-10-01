@@ -401,11 +401,11 @@ purge_container() {
 
     # Remove all images related to the project
     echo "Removing devcontainer images..."
-    docker images --format "table {{.Repository}}:{{.Tag}}" | grep -E "($purge_pattern|devcontainer|basecamp)" | awk '{print $1}' | xargs -r docker rmi -f
+    docker images --format "table {{.Repository}}:{{.Tag}}" | grep -E "($purge_pattern)" | awk '{print $1}' | xargs -r docker rmi -f
 
     # Remove all volumes related to the project (with force if needed)
     echo "Removing devcontainer volumes..."
-    docker volume ls --format "{{.Name}}" | grep -E "($purge_pattern|devcontainer|basecamp)" | while read volume; do
+    docker volume ls --format "{{.Name}}" | grep -E "($purge_pattern)" | while read volume; do
         echo "Removing volume: $volume"
         docker volume rm -f "$volume" 2>/dev/null || echo "Volume $volume could not be removed (may be in use)"
     done

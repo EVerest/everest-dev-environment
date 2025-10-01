@@ -1,4 +1,4 @@
-# 📋 Basecamp Command Reference
+# 📋 EVerest Setup Command Reference
 
 ## 🚀 Environment Management
 

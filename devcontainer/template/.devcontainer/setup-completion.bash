@@ -17,7 +17,7 @@ _setup_completion() {
 
     # Function to get available Node-RED flows dynamically
     _get_nodered_flows() {
-        # Check if we're in the basecamp directory and container is running
+        # Check if we're in the everest directory and container is running
         if [ -f "setup" ] && docker compose -p everest -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml ps devcontainer | grep -q "Up"; then
             # Get flows from the container
             docker compose -p everest -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml exec -T devcontainer find /workspace -name "*flow.json" -type f 2>/dev/null | xargs -I {} basename {} | sed 's/-flow.json$//' | sort | uniq
