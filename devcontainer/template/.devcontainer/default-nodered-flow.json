@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {
+      "id": "welcome-message",
+      "type": "ui_text",
+      "x": 200,
+      "y": 100,
+      "w": 600,
+      "h": 300,
+      "label": "Welcome to Basecamp Node-RED",
+      "format": "<h2>🚀 Basecamp Node-RED UI</h2><p>Welcome to the Basecamp development environment!</p><h3>📋 Getting Started:</h3><ol><li><strong>Build the project:</strong><br><code>./setup prompt</code><br><code>cmake -B build -S . && ninja -C build</code></li><li><strong>Select a flow:</strong><br><code>./setup nodered-flow &lt;config&gt;</code></li><li><strong>Start SIL simulation manually</strong></li></ol><h3>🔧 Available Commands:</h3><ul><li><code>./setup nodered-flows</code> - List available flows</li><li><code>./setup nodered-flow dc</code> - Switch to DC simulation flow</li><li><code>./setup nodered-status</code> - Show current flow status</li></ul><p><em>Flows will be available after building the project with cmake and ninja.</em></p>",
+      "group": "Welcome",
+      "order": 1
+    }
+  ],
+  "groups": [
+    {
+      "id": "welcome-group",
+      "title": "Welcome to Basecamp",
+      "x": 100,
+      "y": 50,
+      "width": 700,
+      "height": 400
+    }
+  ],
+  "flows": [
+    {
+      "id": "welcome-flow",
+      "label": "Welcome Flow",
+      "nodes": [
+        {
+          "id": "welcome-message",
+          "type": "ui_text",
+          "x": 200,
+          "y": 100,
+          "w": 600,
+          "h": 300,
+          "label": "Welcome to Basecamp Node-RED",
+          "format": "<h2>🚀 Basecamp Node-RED UI</h2><p>Welcome to the Basecamp development environment!</p><h3>📋 Getting Started:</h3><ol><li><strong>Build the project:</strong><br><code>./setup prompt</code><br><code>cmake -B build -S . && ninja -C build</code></li><li><strong>Select a flow:</strong><br><code>./setup nodered-flow &lt;config&gt;</code></li><li><strong>Start SIL simulation manually</strong></li></ol><h3>🔧 Available Commands:</h3><ul><li><code>./setup nodered-flows</code> - List available flows</li><li><code>./setup nodered-flow dc</code> - Switch to DC simulation flow</li><li><code>./setup nodered-status</code> - Show current flow status</li></ul><p><em>Flows will be available after building the project with cmake and ninja.</em></p>",
+          "group": "welcome-group"
+        }
+      ]
+    }
+  ],
+  "version": "4.0.0"
+}
