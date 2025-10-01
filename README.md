@@ -35,11 +35,25 @@ Tested with Linux, specifically with Ubuntu 22.04 and 24.04.
 
 2. **Install DevContainer template:**
    You can use the following command to download and install the devcontainer template:
+
+   **One-liner (automated with defaults):**
    ```bash
-   export BRANCH="main" && bash -c "$(curl -s --variable %BRANCH=main --expand-url https://raw.githubusercontent.com/EVerest/everest-dev-environment/{{BRANCH}}/devcontainer/template/setup)" install
+   curl -s https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup > setup && chmod +x setup && echo -e "\n\ny" | ./setup install
    ```
 
-   On certain systems with an older version of curl the command above will fail. In that case, you need to manually download the repository and execute the script:
+   **Alternative (download first, then run):**
+   ```bash
+   curl -s -o setup https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup
+   chmod +x setup
+   ./setup install
+   ```
+
+   The script will ask you for:
+   1. **Workspace directory**: Press Enter to use current directory (recommended)
+   2. **Version**: Press Enter to use 'main' (recommended)
+   3. **Continue if directory not empty**: Type 'y' and press Enter (since you downloaded the setup script)
+
+   **Manual clone (if curl fails):**
    ```bash
    git clone git@github.com:EVerest/everest-dev-environment.git
    ./everest-dev-environment/devcontainer/template/setup install
@@ -248,7 +262,7 @@ To work with multiple everest repositories:
 
 ```bash
 mkdir myworkspace
-export BRANCH="main" && bash -c "$(curl -s --variable %BRANCH=main --expand-url https://raw.githubusercontent.com/EVerest/everest-dev-environment/{{BRANCH}}/devcontainer/template/setup)" install
+curl -s https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup > setup && chmod +x setup && echo -e "\n\ny" | ./setup install
 # if the above command fails, just manually clone the repo and execute the setup script:
 #    git clone git@github.com:EVerest/everest-dev-environment.git
 #   ./everest-dev-environment/devcontainer/template/setup install
