@@ -5,12 +5,13 @@ So far this is the [edm - the Everest Dependency Manager](dependency_manager/REA
 
 You can install [edm](dependency_manager/README.md) very easy using pip.
 
-All documentation and the issue tracking can be found in our main repository here: https://github.com/EVerest/everest
-Please check as well the complete documentation at https://docs.pionix.de
+All documentation and the issue tracking can be found in our main repository here: <https://github.com/EVerest/everest>
+Please check as well the complete documentation at <https://docs.pionix.de>
 
-## 🚀 SIL Simulation
+## SIL Simulation
 
 For Command Reference, see:
+
 - **[Command Reference](doc/COMMAND_REFERENCE.md)** - List of commands and their meaning
 For Software-In-the-Loop (SIL) simulations, see:
 - **[Complete SIL Guide](doc/SIL_SIMULATION_GUIDE.md)** - Detailed workflow and troubleshooting
@@ -18,6 +19,7 @@ For Software-In-the-Loop (SIL) simulations, see:
 ## Quick Start
 
 ### Prerequisites
+
 - VS Code with Docker extension
 - Docker installed
 - Docker compose installed version V2 (not working with V1)
@@ -37,15 +39,17 @@ Tested with Linux, specifically with Ubuntu 22.04 and 24.04.
    You can use the following command to download and install the devcontainer template:
 
    **One-liner (automated with defaults):**
+
    ```bash
-   curl -s https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup > setup && chmod +x setup && echo -e "\n\ny" | ./setup install
+   curl -s https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup > setup && chmod +x setup && echo -e "\n\ny" | ./setup
    ```
 
    **Alternative (download first, then run):**
+
    ```bash
    curl -s -o setup https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup
    chmod +x setup
-   ./setup install
+   ./setup
    ```
 
    The script will ask you for:
@@ -54,9 +58,10 @@ Tested with Linux, specifically with Ubuntu 22.04 and 24.04.
    3. **Continue if directory not empty**: Type 'y' and press Enter (since you downloaded the setup script)
 
    **Manual clone (if curl fails):**
+
    ```bash
    git clone git@github.com:EVerest/everest-dev-environment.git
-   ./everest-dev-environment/devcontainer/template/setup install
+   ./everest-dev-environment/devcontainer/template/setup
    # you can delete the everest-dev-environment folder, it is not needed anymore
    rm -rf everest-dev-environment
    ```
@@ -65,24 +70,27 @@ Tested with Linux, specifically with Ubuntu 22.04 and 24.04.
    1. Workspace directory: Default is the current directory. You can keep the default by pressing enter.
    2. everest-dev-environment version: Default is 'main'. You can keep the default by pressing enter.
 
-
 3. **Generate environment configuration:**
+
    ```bash
-   ./setup
+   ./devrd env
    ```
 
 4. **Open in VS Code:**
 This will create the `.env` file with your repository information. Then open the workspace in Visual Studio Code:
+
     ```bash
     code .
     ```
+
 Or press Ctrl+O to open the current folder in VSCode.
 
 5. **Reopen in container** when prompted by VS Code.
 
-
 ### VS Code Development (Recommended)
+
 The easiest way to develop is using VS Code with the development container:
+
 1. Follow the [Quick Start](#quick-start) steps above
 2. VS Code will automatically build the container with your repository settings
 3. All development happens inside the container with the correct environment variables
@@ -90,36 +98,35 @@ The easiest way to develop is using VS Code with the development container:
 The contents of `my-workspace` folder are mapped inside the container in the folder called `/workspace`.
 You can exit VS Code at any time, re-running it will cause VS Code to ask you again to reopen in container.
 
-
 ### Manual Docker Setup
 
-If you prefer to run the container outside VS Code, the `./setup` script provides comprehensive control:
+If you prefer to run the container outside VS Code, the `./devrd` script provides comprehensive control:
 
 ```bash
 # Quick start (generate .env and start all services)
-./setup start
+./devrd start
 
 # Step-by-step workflow:
-./setup build                  # Build container (generates .env if missing)
-./setup start                  # Start all services (generates .env if missing)
-./setup env                    # Generate .env file with auto-detected values
-./setup env -v main            # Update specific values in existing .env
-./setup stop                   # Stop all services
-./setup purge                  # Remove all containers, images, and volumes
+./devrd build                  # Build container (generates .env if missing)
+./devrd start                  # Start all services (generates .env if missing)
+./devrd env                    # Generate .env file with auto-detected values
+./devrd env -v main            # Update specific values in existing .env
+./devrd stop                   # Stop all services
+./devrd purge                  # Remove all containers, images, and volumes
 
 # Container access:
-./setup prompt                 # Get interactive shell in container
-./setup exec <command>         # Execute single command in container
+./devrd prompt                 # Get interactive shell in container
+./devrd exec <command>         # Execute single command in container
 
 # Node-RED SIL Simulation:
-./setup nodered-flows          # List available simulation flows
-./setup nodered-flow <name>    # Switch to specific simulation
-./setup nodered-status         # Check Node-RED status
+./devrd nodered-flows          # List available simulation flows
+./devrd nodered-flow <name>    # Switch to specific simulation
+./devrd nodered-status         # Check Node-RED status
 
 # Custom environment configuration:
-./setup env -v main            # Use specific everest tool branch
-./setup env -h git@git.org.com:MyOrg/everest-core.git  # Set git hosting URL (extracts host, user, org)
-./setup env -w /path/to/workspace  # Set workspace directory mapping
+./devrd env -v main            # Use specific everest tool branch
+./devrd env -h git@git.org.com:MyOrg/everest-core.git  # Set git hosting URL (extracts host, user, org)
+./devrd env -w /path/to/workspace  # Set workspace directory mapping
 
 # .env file behavior:
 # - Missing/empty: Generated with auto-detection
@@ -152,12 +159,14 @@ The `/workspace` directory inside the container can be mapped to any folder on y
 ```
 
 **Use cases:**
+
 - **Default**: Maps the current project root (recommended for development)
 - **Custom folder**: Access files from other directories inside container
 - **Shared tools**: Map system directories for development tools
 - **Multi-project**: Work with multiple projects simultaneously
 
 **Important notes:**
+
 - The folder must exist and be accessible
 - Relative paths are converted to absolute paths
 - The mapping persists in `.env` file for future container starts
@@ -176,6 +185,7 @@ source .devcontainer/setup-completion.bash
 ```
 
 **Available completions:**
+
 - **Commands**: `install`, `env`, `build`, `start`, `stop`, `prompt`, `purge`, `exec`, `nodered-flows`, `nodered-flow`, `nodered-status`
 - **Options**: `-v`, `--version`, `-h`, `--hosting`, `-o`, `--org`, `-w`, `--workspace`, `--help`
 - **Node-RED flows**: Dynamically detected from container
@@ -183,32 +193,33 @@ source .devcontainer/setup-completion.bash
 - **Common commands**: For exec option
 
 **Example usage:**
+
 ```bash
-./setup <TAB>                    # Shows all commands
-./setup install <TAB>            # Shows install command
-./setup nodered-flow <TAB>       # Shows available flows
-./setup env -v <TAB>             # Shows version options
-./setup exec <TAB>               # Shows common commands
-```
+./devrd <TAB>                    # Shows all commands
+./devrd nodered-flow <TAB>       # Shows available flows
+./devrd env -v <TAB>             # Shows version options
+./devrd exec <TAB>               # Shows common commands
 ```
 
-## 🚀 SIL Simulation Quick Start
+```
+
+## SIL Simulation Quick Start
 
 ### Complete Workflow (5 minutes)
 ```bash
 # 1. Start environment (HOST)
-./setup start
+./devrd start
 
 # 2. Build project (CONTAINER)
-./setup prompt
+./devrd prompt
 cd /workspace
 cmake -B build -S . -GNinja && ninja -C build install/strip
 
 # 3. Switch to simulation (HOST)
-./setup nodered-flow config-sil-dc
+./devrd nodered-flow config-sil-dc
 
 # 4. Start simulation (CONTAINER)
-./setup prompt
+./devrd prompt
 cd /workspace/build
 ./run-scripts/run-sil-dc.sh
 
@@ -217,13 +228,15 @@ cd /workspace/build
 ```
 
 ### Available Services
+
 | Service | URL | Purpose |
 |---------|-----|---------|
-| **Node-RED UI** | http://localhost:1881/ui | SIL simulation interface |
-| **MQTT Explorer** | http://localhost:4000 | MQTT topic browser |
-| **Steve (HTTP)** | http://localhost:8180 | OCPP backend management |
+| **Node-RED UI** | <http://localhost:1881/ui> | SIL simulation interface |
+| **MQTT Explorer** | <http://localhost:4000> | MQTT topic browser |
+| **Steve (HTTP)** | <http://localhost:8180> | OCPP backend management |
 
 ### Available Simulations
+
 | Flow Name | Description | Script |
 |-----------|-------------|--------|
 | `config-sil-dc` | Single DC charging | `cd /workspace/build && ./run-scripts/run-sil-dc.sh` |
@@ -233,11 +246,12 @@ cd /workspace/build
 | `config-sil` | Basic SIL simulation | `cd /workspace/build && ./run-scripts/run-sil.sh` |
 
 ### Troubleshooting
+
 | Issue | Solution |
 |-------|----------|
-| Node-RED not starting | `./setup nodered-status` then `./setup stop && ./setup start` |
-| No flows available | `./setup prompt` then `cd /workspace && cmake -B build -S . -GNinja && ninja -C build install/strip` |
-| Port conflicts | `sudo lsof -ti:1881 \| xargs sudo kill -9` then `./setup start` |
+| Node-RED not starting | `./devrd nodered-status` then `./devrd stop && ./devrd start` |
+| No flows available | `./devrd prompt` then `cd /workspace && cmake -B build -S . -GNinja && ninja -C build install/strip` |
+| Port conflicts | `sudo lsof -ti:1881 \| xargs sudo kill -9` then `./devrd start` |
 | SIL script not found | Ensure you're in container and project is built |
 
 ## Building EVerest
@@ -262,15 +276,15 @@ To work with multiple everest repositories:
 
 ```bash
 mkdir myworkspace
-curl -s https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup > setup && chmod +x setup && echo -e "\n\ny" | ./setup install
+curl -s https://raw.githubusercontent.com/EVerest/everest-dev-environment/main/devcontainer/template/setup > setup && chmod +x setup && echo -e "\n\ny" | ./setup
 # if the above command fails, just manually clone the repo and execute the setup script:
 #    git clone git@github.com:EVerest/everest-dev-environment.git
-#   ./everest-dev-environment/devcontainer/template/setup install
+#   ./everest-dev-environment/devcontainer/template/setup
 cd myworkspace
-./setup build # generates .env if missing and build the container
+./devrd build # generates .env if missing and build the container
 code . # if you use VSCode
-./setup start # not using VSCode (generates .env if missing)
-./setup prompt # not using VSCode
+./devrd start # not using VSCode (generates .env if missing)
+./devrd prompt # not using VSCode
 # inside the container
 cd /workspace
 everest clone everest-core # or use the git command to clone
@@ -284,6 +298,7 @@ ninja -C build install/strip
 ## Environment Variables
 
 The container automatically sets these variables based on your repository:
+
 - `EVEREST_DEV_TOOL_DEFAULT_GIT_METHOD`: ssh or http (for everest-core must be set to ssh)
 - `EVEREST_DEV_TOOL_DEFAULT_GIT_HOST`: github.com or your company git host (if applicable)
 - `EVEREST_DEV_TOOL_DEFAULT_GIT_SSH_USER`: the ssh default user (git or forgejo, etc)
@@ -293,6 +308,7 @@ The container automatically sets these variables based on your repository:
 ## Troubleshooting
 
 **Regenerate environment configuration:**
+
 ```bash
 ./setup env                   # Generate new .env file with auto-detection
 ./setup env -v main           # Update only branch in existing file
@@ -300,6 +316,7 @@ The container automatically sets these variables based on your repository:
 ```
 
 **Customize environment variables:**
+
 ```bash
 # Use specific branch for everest-dev-environment
 ./setup env -v release/1.0
@@ -309,11 +326,13 @@ The container automatically sets these variables based on your repository:
 ```
 
 **Check available services:**
+
 ```bash
 everest services --help
 ```
 
 **Purge clean the container, images and volumes and rebuild everything:**
+
 ```bash
 ./setup purge                  # Remove all resources for current folder
 ./setup purge my-project       # Remove all resources matching 'my-project' pattern
@@ -323,6 +342,7 @@ everest services --help
 **Note:** You might want to delete the cloned repositories (if needed).
 
 **After git pull with container changes:**
+
 ```bash
 # If you pulled changes that modify the container configuration
 ./setup purge                  # Remove old containers and images
@@ -333,6 +353,7 @@ everest services --help
 **Note:** This is especially important when the Dockerfile, docker-compose.yml, or other container-related files have been updated.
 
 **Working with multiple instances or branches:**
+
 ```bash
 # If you're working on multiple everest instances or branches simultaneously
 # Each instance should use a different workspace directory to avoid conflicts
@@ -360,6 +381,7 @@ git clone <different-repo> .
 ```
 
 **Important considerations:**
+
 - **Port conflicts**: Each instance uses the same ports (1883, 1881, 4000, etc.). Only one instance can run at a time.
 - **Volume conflicts**: Docker volumes are shared. Use `./setup purge` before switching instances.
 - **SSH keys**: Ensure your SSH agent has the necessary keys for all repositories.
@@ -367,6 +389,7 @@ git clone <different-repo> .
 - **Container naming**: Docker containers are named based on the workspace directory to avoid conflicts.
 
 **Switching between instances:**
+
 ```bash
 # Stop current instance
 ./setup stop
@@ -384,6 +407,7 @@ cd ~/different-everest-directory
 ### Python Prerequisites
 
 For development outside containers, install:
+
 ```bash
 python3 -m pip install protobuf grpcio-tools nanopb==0.4.8
 ```
@@ -391,6 +415,7 @@ python3 -m pip install protobuf grpcio-tools nanopb==0.4.8
 ### EDM Prerequisites
 
 To be able to compile using Forgejo, you need to have edm tool at least with version 0.8.0:
+
 ```bash
 edm --version
 edm 0.8.0
@@ -422,4 +447,3 @@ cmake -S . -B build-cross -GNinja
 DESTDIR=dist ninja -C build-cross install/strip && \
     rsync -av build-cross/dist/var/everest root@<actual_ip_addres_of_target>:/var
 ```
-

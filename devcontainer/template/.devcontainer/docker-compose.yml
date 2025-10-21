@@ -10,6 +10,10 @@ services:
     ports:
       - 1883:1883
       - 9001:9001
+    profiles:
+      - mqtt
+      - ocpp
+      - sil
 
   ocpp-db:
     image: mariadb:10.4.30 # pinned to patch-version because https://github.com/steve-community/steve/pull/1213
@@ -22,6 +26,8 @@ services:
       MYSQL_DATABASE: ocpp-db
       MYSQL_USER: ocpp
       MYSQL_PASSWORD: ocpp
+    profiles:
+      - ocpp
   steve:
     image: ghcr.io/everest/everest-dev-environment/steve:docker-images-v0.2.0
     ports:
@@ -29,12 +35,16 @@ services:
       - 8443:8443
     depends_on:
       - ocpp-db
+    profiles:
+      - ocpp
   mqtt-explorer:
     image: ghcr.io/everest/everest-dev-environment/mqtt-explorer:docker-images-v0.1.0
     depends_on:
       - mqtt-server
     ports:
       - 4000:4000
+    profiles:
+      - sil
   nodered:
     image: ghcr.io/everest/everest-dev-environment/nodered:docker-images-v0.1.0
     ports:
@@ -55,3 +65,5 @@ services:
         /init-nodered-flows.sh &&
         node-red --userDir=/data
       "
+    profiles:
+      - sil

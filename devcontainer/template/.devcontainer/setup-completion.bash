@@ -10,17 +10,20 @@ _setup_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Available commands
-    cmds="env build start stop prompt purge exec nodered-flows nodered-flow nodered-status"
+    cmds="install env build start stop prompt purge exec nodered-flows nodered-flow nodered-status"
 
     # Available options
-    opts="-v --version -h --hosting -o --org -w --workspace --help"
+    opts="-v --version -w --workspace --help"
 
     # Function to get available Node-RED flows dynamically
     _get_nodered_flows() {
-        # Check if we're in the everest directory and container is running
-        if [ -f "setup" ] && docker compose -p everest -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml ps devcontainer | grep -q "Up"; then
+        # Get the current project name (same logic as setup script)
+        local project_name="${DOCKER_COMPOSE_PROJECT_NAME:-$(basename "$(pwd)")_devcontainer}"
+
+        # Check if we're in the right directory and container is running
+        if [ -f "setup" ] && docker compose -p "$project_name" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml ps devcontainer | grep -q "Up"; then
             # Get flows from the container
-            docker compose -p everest -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml exec -T devcontainer find /workspace -name "*flow.json" -type f 2>/dev/null | xargs -I {} basename {} | sed 's/-flow.json$//' | sort | uniq
+            docker compose -p "$project_name" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml exec -T devcontainer find /workspace -name "*flow.json" -type f 2>/dev/null | xargs -I {} basename {} | sed 's/-flow.json$//' | sort | uniq
         else
             # Fallback to common flow names
             echo "dc config-sil-dc"
@@ -28,9 +31,9 @@ _setup_completion() {
     }
 
     # Function to get available container names
-    _get_container_names() {
-        echo "devcontainer mqtt-server mqtt-explorer ocpp-db steve nodered docker-proxy"
-    }
+_get_container_names() {
+    echo "mqtt ocpp sil"
+}
 
     # If the previous word is an option that takes an argument, complete based on the option
     case "$prev" in
@@ -38,16 +41,6 @@ _setup_completion() {
         -v|--version)
             # Complete with common version patterns
             COMPREPLY=( $(compgen -W "main master develop release/1.0 release/1.1" -- "$cur") )
-            return 0
-            ;;
-        -h|--hosting)
-            # Complete with common hosting URLs
-            COMPREPLY=( $(compgen -W "ssh://forgejo@git.pionix.com/Pionix/ https://github.com/ https://gitlab.com/" -- "$cur") )
-            return 0
-            ;;
-        -o|--org)
-            # Complete with common organization names
-            COMPREPLY=( $(compgen -W "Pionix mycompany" -- "$cur") )
             return 0
             ;;
         -w|--workspace)
