@@ -52,7 +52,6 @@ services:
     volumes:
       - node-red-data:/data
       - ./nodered-settings.js:/data/settings.js
-      - ./init-nodered-flows.sh:/init-nodered-flows.sh
     environment:
       - NODE_RED_ENABLE_PROJECTS=false
       - MQTT_BROKER=mqtt-server
@@ -60,10 +59,6 @@ services:
       - NODE_RED_HOME=/usr/src/node-red
       - FLOWS=/data/flows.json
       - USERDIR=/data
-    entrypoint: >
-      sh -c "
-        /init-nodered-flows.sh &&
-        node-red --userDir=/data
-      "
+    command: node-red --userDir=/data
     profiles:
       - sil

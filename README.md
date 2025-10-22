@@ -6,7 +6,6 @@ So far this is the [edm - the Everest Dependency Manager](dependency_manager/REA
 You can install [edm](dependency_manager/README.md) very easy using pip.
 
 All documentation and the issue tracking can be found in our main repository here: <https://github.com/EVerest/everest>
-Please check as well the complete documentation at <https://docs.pionix.de>
 
 ## SIL Simulation
 
@@ -119,9 +118,8 @@ If you prefer to run the container outside VS Code, the `./devrd` script provide
 ./devrd exec <command>         # Execute single command in container
 
 # Node-RED SIL Simulation:
-./devrd nodered-flows          # List available simulation flows
-./devrd nodered-flow <name>    # Switch to specific simulation
-./devrd nodered-status         # Check Node-RED status
+./devrd flows                  # List available simulation flows
+./devrd flow <path>            # Switch to specific flow file
 
 # Custom environment configuration:
 ./devrd env -v main            # Use specific everest tool branch
@@ -139,23 +137,23 @@ The `/workspace` directory inside the container can be mapped to any folder on y
 
 ```bash
 # Default behavior (maps parent of .devcontainer, so by default your `my-workspace` folder)
-./setup start
+./devrd start
 
 # Map to custom folder
-./setup env -w ~/checkout
-./setup start
+./devrd env -w ~/checkout
+./devrd start
 
 # Map to current directory
-./setup env -w .
-./setup start
+./devrd env -w .
+./devrd start
 
 # Map to absolute path
-./setup env -w /opt/tools
-./setup start
+./devrd env -w /opt/tools
+./devrd start
 
 # Map to relative path
-./setup env -w ../other-project
-./setup start
+./devrd env -w ../other-project
+./devrd start
 ```
 
 **Use cases:**
@@ -172,31 +170,36 @@ The `/workspace` directory inside the container can be mapped to any folder on y
 - The mapping persists in `.env` file for future container starts
 - Only one folder can be mapped at a time
 
-### Bash Completion (Optional)
+### Shell Completion (Optional)
 
-For enhanced command-line experience, install bash completion for the setup script:
+For enhanced command-line experience, enable shell completion for the devrd script:
 
+**For Bash:**
 ```bash
-# Install completion (adds to your .bashrc)
-.devcontainer/install-completion.sh
+# Add to your ~/.bashrc
+source .devcontainer/devrd-completion.bash
+```
 
-# Or source manually for current session
-source .devcontainer/setup-completion.bash
+**For Zsh:**
+```bash
+# Add to your ~/.zshrc
+autoload -U compinit && compinit
+source .devcontainer/devrd-completion.zsh
 ```
 
 **Available completions:**
 
-- **Commands**: `install`, `env`, `build`, `start`, `stop`, `prompt`, `purge`, `exec`, `nodered-flows`, `nodered-flow`, `nodered-status`
-- **Options**: `-v`, `--version`, `-h`, `--hosting`, `-o`, `--org`, `-w`, `--workspace`, `--help`
-- **Node-RED flows**: Dynamically detected from container
-- **Directories**: For workspace option
-- **Common commands**: For exec option
+- **Commands**: `env`, `build`, `start`, `stop`, `prompt`, `purge`, `exec`, `flows`, `flow`
+- **Options**: `-v`, `--version`, `-w`, `--workspace`, `--help`
+- **Node-RED flows**: dynamically detected from container (full file paths)
+- **Directories**: for workspace option
+- **Common commands**: for exec option
 
 **Example usage:**
 
 ```bash
 ./devrd <TAB>                    # Shows all commands
-./devrd nodered-flow <TAB>       # Shows available flows
+./devrd flow <TAB>       # Shows available flows
 ./devrd env -v <TAB>             # Shows version options
 ./devrd exec <TAB>               # Shows common commands
 ```
@@ -216,7 +219,7 @@ cd /workspace
 cmake -B build -S . -GNinja && ninja -C build install/strip
 
 # 3. Switch to simulation (HOST)
-./devrd nodered-flow config-sil-dc
+./devrd flow config-sil-dc
 
 # 4. Start simulation (CONTAINER)
 ./devrd prompt
@@ -249,7 +252,7 @@ cd /workspace/build
 
 | Issue | Solution |
 |-------|----------|
-| Node-RED not starting | `./devrd nodered-status` then `./devrd stop && ./devrd start` |
+| Node-RED not starting | Check container logs: `docker logs <container-name>` then `./devrd stop && ./devrd start` |
 | No flows available | `./devrd prompt` then `cd /workspace && cmake -B build -S . -GNinja && ninja -C build install/strip` |
 | Port conflicts | `sudo lsof -ti:1881 \| xargs sudo kill -9` then `./devrd start` |
 | SIL script not found | Ensure you're in container and project is built |
@@ -310,19 +313,19 @@ The container automatically sets these variables based on your repository:
 **Regenerate environment configuration:**
 
 ```bash
-./setup env                   # Generate new .env file with auto-detection
-./setup env -v main           # Update only branch in existing file
-./setup env -h git@git.org.com:MyOrg/everest-core.git  # Update hosting info in existing file (extracts host, user, org)
+./devrd env                   # Generate new .env file with auto-detection
+./devrd env -v main           # Update only branch in existing file
+./devrd env -h git@git.org.com:MyOrg/everest-core.git  # Update hosting info in existing file (extracts host, user, org)
 ```
 
 **Customize environment variables:**
 
 ```bash
 # Use specific branch for everest-dev-environment
-./setup env -v release/1.0
+./devrd env -v release/1.0
 
 # Use custom hosting URL (extracts host, user, and organization)
-./setup env -h git@git.org.com:MyOrg/everest-core.git
+./devrd env -h git@git.org.com:MyOrg/everest-core.git
 ```
 
 **Check available services:**
@@ -334,9 +337,9 @@ everest services --help
 **Purge clean the container, images and volumes and rebuild everything:**
 
 ```bash
-./setup purge                  # Remove all resources for current folder
-./setup purge my-project       # Remove all resources matching 'my-project' pattern
-./setup build                  # Will generate .env if missing
+./devrd purge                  # Remove all resources for current folder
+./devrd purge my-project       # Remove all resources matching 'my-project' pattern
+./devrd build                  # Will generate .env if missing
 ```
 
 **Note:** You might want to delete the cloned repositories (if needed).
@@ -345,9 +348,9 @@ everest services --help
 
 ```bash
 # If you pulled changes that modify the container configuration
-./setup purge                  # Remove old containers and images
-./setup build                  # Rebuild with new configuration
-./setup start                  # Start the updated environment
+./devrd purge                  # Remove old containers and images
+./devrd build                  # Rebuild with new configuration
+./devrd start                  # Start the updated environment
 ```
 
 **Note:** This is especially important when the Dockerfile, docker-compose.yml, or other container-related files have been updated.
@@ -364,26 +367,26 @@ everest services --help
 mkdir ~/everest-main
 cd ~/everest-main
 git clone <repository> .
-./setup -w ~/everest-main
+./devrd -w ~/everest-main
 
 # Instance 2 (feature branch)
 mkdir ~/everest-feature
 cd ~/everest-feature
 git clone <repository> .
 git checkout feature-branch
-./setup -w ~/everest-feature
+./devrd -w ~/everest-feature
 
 # Instance 3 (different project)
 mkdir ~/everest-project2
 cd ~/everest-project2
 git clone <different-repo> .
-./setup -w ~/everest-project2
+./devrd -w ~/everest-project2
 ```
 
 **Important considerations:**
 
 - **Port conflicts**: Each instance uses the same ports (1883, 1881, 4000, etc.). Only one instance can run at a time.
-- **Volume conflicts**: Docker volumes are shared. Use `./setup purge` before switching instances.
+- **Volume conflicts**: Docker volumes are shared. Use `./devrd purge` before switching instances.
 - **SSH keys**: Ensure your SSH agent has the necessary keys for all repositories.
 - **Workspace isolation**: Use different workspace directories (`-w` option) for each instance.
 - **Container naming**: Docker containers are named based on the workspace directory to avoid conflicts.
@@ -392,14 +395,14 @@ git clone <different-repo> .
 
 ```bash
 # Stop current instance
-./setup stop
+./devrd stop
 
 # Purge if switching to different branch/project
-./setup purge
+./devrd purge
 
 # Start new instance
 cd ~/different-everest-directory
-./setup start
+./devrd start
 ```
 
 ## Bare Metal Development
@@ -435,7 +438,7 @@ Install the SDK as provided by Yocto (or similar).
 Activate the environment (typically by sourcing the a script).
 
 ```bash
-cd {...}/everest
+cd {...}/everest-core
 cmake -S . -B build-cross -GNinja
   -DCMAKE_INSTALL_PREFIX=/var/everest
   -DEVC_ENABLE_CCACHE=1

@@ -46,18 +46,24 @@ validate_folder() {
 # Function to generate .env file
 generate_env() {
     # Process command line options
-    local i=0
-    while [ $i -lt ${#ENV_OPTIONS[@]} ]; do
-        case "${ENV_OPTIONS[$i]}" in
-            -v|--version)
-                EVEREST_TOOL_BRANCH="${ENV_OPTIONS[$((i+1))]}"
-                ;;
-            -w|--workspace)
-                WORKSPACE_FOLDER="${ENV_OPTIONS[$((i+1))]}"
-                ;;
-        esac
-        i=$((i+2))
-    done
+    if [ -n "$ENV_OPTIONS" ]; then
+        set -- $ENV_OPTIONS
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -v|--version)
+                    EVEREST_TOOL_BRANCH="$2"
+                    shift 2
+                    ;;
+                -w|--workspace)
+                    WORKSPACE_FOLDER="$2"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+    fi
 
     # Set workspace folder
     if [ -n "$WORKSPACE_FOLDER" ]; then
@@ -88,13 +94,14 @@ EOF
         echo "Generated .env file"
     else
         echo "Found existing .env file"
+        cat "$ENV_FILE"
     fi
 }
 
 # Function to build the container
 build_container() {
     echo "Building development container..."
-    docker_compose build
+    docker_compose --profile sil build
 }
 
 # Function to get actual port mapping from docker compose
@@ -235,7 +242,7 @@ purge_container() {
     echo "Cleaning up dangling resources..."
     docker system prune -f
 
-    echo "Purge complete! All devcontainer resources have been removed."
+    echo "✔ Purge complete! All devcontainer resources have been removed."
 }
 
 # Function to check if SSH agent is running
@@ -283,129 +290,107 @@ prompt_container() {
     docker_compose exec devcontainer /bin/bash
 }
 
-# Function to list available Node-RED flows
-list_nodered_flows() {
+# Function to list available flows
+list_flows() {
     echo ""
     echo "Available Node-RED Flows:"
     echo "============================="
 
     # Check if container is running
     if ! docker_compose ps | grep -q "nodered"; then
-        echo "Error: Node-RED container is not running"
+        echo "✖ Node-RED container is not running"
         echo "Please start with './devrd start' first"
         return 1
     fi
 
-    # Find all flow files in both CPM cache and workspace (remove duplicates by basename)
-    local flows_cpm=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
-    local flows_workspace=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
-
-    # Combine and deduplicate flows
-    local flows=$(echo -e "$flows_cpm\n$flows_workspace" | sort | uniq)
+    # Find all flow files in the workspace
+    local flows=$(docker_compose exec -T devcontainer find /workspace -name "*-flow.json" -type f 2>/dev/null | sort)
 
     if [ -z "$flows" ]; then
-        echo "No flows found in CPM cache or workspace"
-        echo "Please run 'cmake -B build -S . -GNinja && ninja -C build install/strip' first"
+        echo "No flow files found in workspace"
         echo ""
-        echo "Expected locations:"
-        echo "  /home/docker/.cache/cpm/*/everest-core/config/nodered/*-flow.json"
-        echo "  /workspace/everest-core/config/nodered/*-flow.json"
+        echo "Expected pattern: *-flow.json"
+        echo "Search location: /workspace"
         return 1
     fi
 
-    echo "Found $(echo "$flows" | wc -l) flow(s):"
+    echo "Found $(echo "$flows" | wc -l) flow file(s):"
     echo ""
+    local count=1
     for flow in $flows; do
-        local name=$(echo "$flow" | sed 's/-flow\.json$//')
-        echo "  $name"
+        local basename=$(basename "$flow")
+        local dirname=$(dirname "$flow" | sed 's|/workspace/||')
+        echo "     Path: $dirname/$basename"
+        count=$((count + 1))
     done
     echo ""
-    echo "Usage: ./devrd nodered-flow <flow-name>"
+    echo "Usage: ./devrd flow <flow-file-path>"
+    echo "Example: ./devrd flow everest-core/config/nodered/config-sil-dc-flow.json"
+    echo ""
 }
 
-# Function to switch Node-RED flow
-switch_nodered_flow() {
-    local flow_name=$1
+# Function to switch flow using REST API
+switch_flow() {
+    local flow_path="$1"
 
-    if [ -z "$flow_name" ]; then
-        echo "Error: Please specify a flow name"
+    if [ -z "$flow_path" ]; then
+        echo "Error: Please specify a flow file path"
         echo ""
         echo "Available flows:"
-        list_nodered_flows
+        list_flows
         return 1
     fi
 
     # Check if container is running
     if ! docker_compose ps | grep -q "nodered"; then
-        echo "Error: Node-RED container is not running"
+        echo "✖ Node-RED container is not running"
         echo "Please start with './devrd start' first"
         return 1
     fi
 
-        # Find the flow file in both CPM cache and workspace (handle both full names and short names)
-    local flow_file=""
+    # Construct full path in container
+    local full_path="/workspace/$flow_path"
 
-    # First try the exact name as provided in CPM cache
-    flow_file=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "$flow_name-flow.json" -type f 2>/dev/null | head -1)
-
-    # If not found, try with config-sil- prefix in CPM cache
-    if [ -z "$flow_file" ]; then
-        flow_file=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "config-sil-$flow_name-flow.json" -type f 2>/dev/null | head -1)
-    fi
-
-    # If not found in CPM cache, try workspace
-    if [ -z "$flow_file" ]; then
-        flow_file=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "$flow_name-flow.json" -type f 2>/dev/null | head -1)
-    fi
-
-    # If still not found, try with config-sil- prefix in workspace
-    if [ -z "$flow_file" ]; then
-        flow_file=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "config-sil-$flow_name-flow.json" -type f 2>/dev/null | head -1)
-    fi
-
-    if [ -z "$flow_file" ]; then
-        echo "Error: Flow '$flow_name-flow.json' or 'config-sil-$flow_name-flow.json' not found"
+    # Check if file exists and is readable
+    if ! docker_compose exec -T devcontainer test -r "$full_path" 2>/dev/null; then
+        echo "✖ Flow file not found or not readable: $flow_path"
         echo ""
-        echo "Available flows in CPM cache and workspace:"
-        local flows_cpm=$(docker_compose exec -T devcontainer find /home/docker/.cache/cpm -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
-        local flows_workspace=$(docker_compose exec -T devcontainer find /workspace/everest-core/config/nodered -name "*-flow.json" -type f 2>/dev/null | xargs -I {} basename {} 2>/dev/null)
-        echo -e "$flows_cpm\n$flows_workspace" | sort | uniq
+        echo "Available flows:"
+        list_flows
         return 1
     fi
 
-    echo "Switching Node-RED to flow: $flow_name"
-    echo "Source: $flow_file"
+    echo "Switching Node-RED to flow: $(basename "$flow_path")"
+    echo "Source: $flow_path"
 
-    # Copy flow to Node-RED volume
-    docker_compose exec -T devcontainer cat "$flow_file" > /tmp/flows.json
-    docker cp /tmp/flows.json ${DOCKER_COMPOSE_PROJECT_NAME}-nodered-1:/data/flows.json
+    # Copy flow to temporary file and process environment variables
+    docker_compose exec -T devcontainer cat "$full_path" > /tmp/flows.json
 
-    # Restart Node-RED to load new flow
-    echo "Restarting Node-RED service..."
-    docker_compose restart nodered
+    # Process environment variables in the flow JSON
+    # Replace "broker": "localhost" with "broker": "mqtt-server"
+    sed -i 's/"broker": "localhost"/"broker": "mqtt-server"/g' /tmp/flows.json
+
+    # Deploy flow via Node-RED REST API
+    echo "Deploying flow via Node-RED API..."
+    local response=$(curl -s -w "%{http_code}" -X POST http://localhost:1881/flows \
+        -H "Content-Type: application/json" \
+        -d @/tmp/flows.json)
+
+    local http_code="${response: -3}"
+
+    if [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
+        echo "✔ Node-RED flow deployed successfully via API!"
+        echo "Access at: http://localhost:1881/ui"
+    else
+        echo "✖ Failed to deploy flow via API (HTTP $http_code)"
+        echo "Response: ${response%???}"
+        return 1
+    fi
 
     # Clean up temporary file
     rm -f /tmp/flows.json
-
-    echo "Node-RED flow switched successfully!"
-    echo "Access at: http://localhost:1881/ui"
 }
 
-# Function to show Node-RED status
-show_nodered_status() {
-    echo ""
-    echo "Node-RED Status:"
-    echo "=================="
-
-    # Check if container is running
-    if docker_compose ps | grep -q "nodered"; then
-        echo "Container: Running"
-        echo "URL: http://localhost:1881/ui"
-    else
-        echo "Container: Not running"
-        echo "Start with './devrd start'"
-    fi
-}
 
 # Function to display help
 show_help() {
@@ -420,9 +405,8 @@ show_help() {
     echo "                          Optional pattern to match (default: current folder name)"
     echo "  exec <command>          Execute a command in the container (requires container to be running)"
     echo "  prompt                  Get a shell prompt in the container (requires container to be running)"
-    echo "  nodered-flows           List available Node-RED flows"
-    echo "  nodered-flow <name>     Switch Node-RED to specific flow"
-    echo "  nodered-status          Show Node-RED status and current flow"
+    echo "  flows                   List available flows"
+    echo "  flow <path>             Switch to specific flow file"
     echo ""
     echo "Options (for env command only):"
 
@@ -434,17 +418,16 @@ show_help() {
     echo "  $0                      # Generate .env file"
     echo "  $0 build                # Build container"
     echo "  $0 start                # Start all containers"
-    echo "  $0 start sil             # Start SIL simulation tools (Node-RED, MQTT Explorer)"
-    echo "  $0 start ocpp            # Start OCPP services (Steve, OCPP DB, MQTT)"
-    echo "  $0 start mqtt            # Start only MQTT server"
-    echo "  $0 stop sil              # Stop SIL simulation tools"
+    echo "  $0 start sil            # Start SIL simulation tools (Node-RED, MQTT Explorer)"
+    echo "  $0 start ocpp           # Start OCPP services (Steve, OCPP DB, MQTT)"
+    echo "  $0 start mqtt           # Start only MQTT server"
+    echo "  $0 stop sil             # Stop SIL simulation tools"
     echo "  $0 purge                # Remove all devcontainer resources for current folder"
     echo "  $0 purge my-project     # Remove all devcontainer resources matching 'my-project'"
     echo "  $0 exec ls -la          # Execute command in container"
     echo "  $0 prompt               # Get shell prompt in container"
-    echo "  $0 nodered-flows        # List available Node-RED flows"
-    echo "  $0 nodered-flow dc      # Switch to DC simulation flow"
-    echo "  $0 nodered-status       # Show Node-RED status"
+    echo "  $0 flows                # List available flows"
+    echo "  $0 flow <path>          # Switch to specific flow file"
 
     echo "  $0 -w ~/Documents                    # Map Documents folder to /workspace"
     echo "  $0 --workspace /opt/tools            # Map tools folder to /workspace"
@@ -453,14 +436,14 @@ show_help() {
 
 # Parse command line arguments
 COMMAND="env"
-ENV_OPTIONS=()
+ENV_OPTIONS=""
 
 # First pass: collect all options
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
     case $1 in
         -v|--version|-w|--workspace)
             # Store env-specific options for later use
-            ENV_OPTIONS+=("$1" "$2")
+            ENV_OPTIONS="$ENV_OPTIONS $1 $2"
             shift 2
             ;;
         --help)
@@ -472,10 +455,16 @@ while [[ $# -gt 0 ]]; do
             # For exec, pass all remaining arguments to the exec function
             break
             ;;
-        env|build|prompt|nodered-flows|nodered-status)
+        env|build|prompt|flows)
             COMMAND="$1"
             shift
             # Don't break here, continue to collect more options
+            ;;
+        flow)
+            COMMAND="$1"
+            shift
+            # For flow, pass any remaining arguments as flow path
+            break
             ;;
         purge)
             COMMAND="$1"
@@ -487,12 +476,6 @@ while [[ $# -gt 0 ]]; do
             COMMAND="$1"
             shift
             # For start/stop, pass any remaining arguments as container name
-            break
-            ;;
-        nodered-flow)
-            COMMAND="$1"
-            shift
-            # For nodered-flow, pass the flow name as argument
             break
             ;;
         *)
@@ -540,18 +523,15 @@ case $COMMAND in
     prompt)
         prompt_container
         ;;
-    nodered-flows)
-        list_nodered_flows
+    flows)
+        list_flows
         ;;
-    nodered-flow)
+    flow)
         if [ $# -eq 0 ]; then
-            echo "Error: nodered-flow command requires a flow name"
+            echo "Error: flow command requires a flow file path"
             show_help
         fi
-        switch_nodered_flow "$1"
-        ;;
-    nodered-status)
-        show_nodered_status
+        switch_flow "$1"
         ;;
     *)
         echo "Unknown command: $COMMAND"

@@ -1,32 +1,36 @@
 #!/bin/bash
 
-# Bash completion for setup script
+# Bash completion for devrd script
 # Source this file or add to your .bashrc to enable completion
 
-_setup_completion() {
+_devrd_completion() {
     local cur prev opts cmds
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Available commands
-    cmds="install env build start stop prompt purge exec nodered-flows nodered-flow nodered-status"
+    cmds="install env build start stop prompt purge exec flows flow"
 
     # Available options
     opts="-v --version -w --workspace --help"
 
     # Function to get available Node-RED flows dynamically
     _get_nodered_flows() {
-        # Get the current project name (same logic as setup script)
+        # Get the current project name (same logic as devrd script)
         local project_name="${DOCKER_COMPOSE_PROJECT_NAME:-$(basename "$(pwd)")_devcontainer}"
 
         # Check if we're in the right directory and container is running
-        if [ -f "setup" ] && docker compose -p "$project_name" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml ps devcontainer | grep -q "Up"; then
-            # Get flows from the container
-            docker compose -p "$project_name" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml exec -T devcontainer find /workspace -name "*flow.json" -type f 2>/dev/null | xargs -I {} basename {} | sed 's/-flow.json$//' | sort | uniq
+        if [ -f "devrd" ] && docker compose -p "$project_name" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml ps devcontainer | grep -q "Up"; then
+            # Get flows from the container and return full paths (relative to workspace)
+            docker compose -p "$project_name" -f .devcontainer/docker-compose.yml -f .devcontainer/general-devcontainer/docker-compose.devcontainer.yml exec -T devcontainer find /workspace -name "*-flow.json" -type f 2>/dev/null | sed 's|/workspace/||' | sort
         else
-            # Fallback to common flow names
-            echo "dc config-sil-dc"
+            # Fallback to common flow file paths
+            echo "everest-core/config/nodered/config-sil-dc-flow.json"
+            echo "everest-core/config/nodered/config-sil-dc-bpt-flow.json"
+            echo "everest-core/config/nodered/config-sil-energy-management-flow.json"
+            echo "everest-core/config/nodered/config-sil-two-evse-flow.json"
+            echo "everest-core/config/nodered/config-sil-flow.json"
         fi
     }
 
@@ -48,8 +52,8 @@ _get_container_names() {
             COMPREPLY=( $(compgen -d -- "$cur") )
             return 0
             ;;
-        nodered-flow)
-            # Complete with available flow names dynamically
+        flow)
+            # Complete with available flow file paths dynamically
             local flows
             flows=$(_get_nodered_flows)
             COMPREPLY=( $(compgen -W "$flows" -- "$cur") )
@@ -87,6 +91,6 @@ _get_container_names() {
 }
 
 # Register the completion function
-complete -F _setup_completion setup
-complete -F _setup_completion ./setup
-complete -F _setup_completion ../setup
+complete -F _devrd_completion devrd
+complete -F _devrd_completion ./devrd
+complete -F _devrd_completion ../devrd

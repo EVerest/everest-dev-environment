@@ -8,7 +8,6 @@ EVerest provides a complete development environment simulations with:
 
 - **Node-RED UI**: Web-based interface for monitoring and control
 - **SIL Configurations**: Pre-configured simulation scenarios
-- **Build Scripts**: Automated setup and execution
 - **Development Tools**: MQTT Explorer, Steve, and more
 
 ## 🎯 Complete Workflow
@@ -31,11 +30,11 @@ ninja -C build install/strip
 ### Phase 2: SIL Simulation
 
 ```bash
-# 4. List available Node-RED flows (HOST)
-./devrd nodered-flows
+# 4. List available flows (HOST)
+./devrd flows
 
 # 5. Switch to your desired simulation flow (HOST)
-./devrd nodered-flow config-sil-dc
+./devrd flow everest-core/config/nodered/config-sil-dc-flow.json
 
 # 6. Start the SIL simulation manually (CONTAINER)
 ./devrd prompt
@@ -67,9 +66,8 @@ cd /workspace/build
 ### Node-RED Management
 
 ```bash
-./devrd nodered-flows           # List available simulation flows
-./devrd nodered-flow <name>     # Switch to specific flow
-./devrd nodered-status          # Show current Node-RED status
+./devrd flows                                    # List all available flow files
+./devrd flow <path>                              # Switch to specific flow file
 ```
 
 ### SIL Simulation Scripts
@@ -145,22 +143,34 @@ Start or stop service groups using profiles:
 
 ## Available SIL Configurations
 
-After building the project, you can access these simulation flows:
+After building the project, you can access these simulation flows using file paths:
 
-| Flow Name | Description | Use Case |
+| Flow File | Description | Use Case |
 |-----------|-------------|----------|
-| `config-sil-dc` | Single DC charging simulation | Basic DC charging testing |
-| `config-sil-dc-bpt` | DC charging with BPT | Bidirectional power transfer |
-| `config-sil-energy-management` | Energy management simulation | Grid integration testing |
-| `config-sil-two-evse` | Two EVSE simulation | Multi-EVSE scenarios |
-| `config-sil` | Basic SIL simulation | General testing |
+| `everest-core/config/nodered/config-sil-dc-flow.json` | Single DC charging simulation | Basic DC charging testing |
+| `everest-core/config/nodered/config-sil-dc-bpt-flow.json` | DC charging with BPT | Bidirectional power transfer |
+| `everest-core/config/nodered/config-sil-energy-management-flow.json` | Energy management simulation | Grid integration testing |
+| `everest-core/config/nodered/config-sil-two-evse-flow.json` | Two EVSE simulation | Multi-EVSE scenarios |
+| `everest-core/config/nodered/config-sil-flow.json` | Basic SIL simulation | General testing |
+
+**Usage:**
+```bash
+# List all available flows
+./devrd flows
+
+# Switch to DC charging flow
+./devrd flow everest-core/config/nodered/config-sil-dc-flow.json
+
+# Switch to energy management flow
+./devrd flow everest-core/config/nodered/config-sil-energy-management-flow.json
+```
 
 ## 🎮 Step-by-Step Example: DC Charging Simulation
 
 ### 1. Start Environment
 
 ```bash
-./setup start
+./devrd start
 ```
 
 **Output:**
@@ -177,7 +187,7 @@ Node-RED UI:       http://localhost:1881/ui
 ### 2. Build Project
 
 ```bash
-./setup prompt
+./devrd prompt
 # Inside container:
 cd /workspace
 cmake -B build -S . -GNinja
@@ -187,7 +197,7 @@ ninja -C build install/strip
 ### 3. List Available Flows
 
 ```bash
-./setup nodered-flows
+./devrd flows
 ```
 
 **Output:**
@@ -195,26 +205,40 @@ ninja -C build install/strip
 ```
 Available Node-RED Flows:
 =============================
-Found 5 flow(s):
-  config-sil-dc-bpt
-  config-sil-dc
-  config-sil-energy-management
-  config-sil
-  config-sil-two-evse
+Found 5 flow file(s):
+
+  1) config-sil-dc-flow.json
+     Path: /everest-core/config/nodered/config-sil-dc-flow.json
+
+  2) config-sil-dc-bpt-flow.json
+     Path: /everest-core/config/nodered/config-sil-dc-bpt-flow.json
+
+  3) config-sil-energy-management-flow.json
+     Path: /everest-core/config/nodered/config-sil-energy-management-flow.json
+
+  4) config-sil-flow.json
+     Path: /everest-core/config/nodered/config-sil-flow.json
+
+  5) config-sil-two-evse-flow.json
+     Path: /everest-core/config/nodered/config-sil-two-evse-flow.json
+
+Usage: ./devrd flow <flow-file-path>
+Example: ./devrd flow everest-core/config/nodered/config-sil-dc-flow.json
 ```
 
 ### 4. Switch to DC Flow
 
 ```bash
-./setup nodered-flow config-sil-dc
+./devrd flow everest-core/config/nodered/config-sil-dc-flow.json
 ```
 
 **Output:**
 
 ```
-Switching Node-RED to flow: dc
-Source: /home/docker/.cache/cpm/.../config-sil-dc-flow.json
-Node-RED flow switched successfully!
+Switching Node-RED to flow: config-sil-dc-flow.json
+Source: everest-core/config/nodered/config-sil-dc-flow.json
+Deploying flow via Node-RED API...
+✔ Node-RED flow deployed successfully via API!
 Access at: http://localhost:1881/ui
 ```
 
@@ -240,28 +264,28 @@ Open <http://localhost:1881/ui> in your browser to:
 ### Node-RED Not Starting
 
 ```bash
-# Check if container is running
-./setup nodered-status
+# Check if container is running (flows checks container status)
+./devrd flows
 
 # If not running, restart tools profile
-./setup stop tools
-./setup start tools
+./devrd stop sil
+./devrd start sil
 
 # Or restart entire environment
-./setup stop
-./setup start
+./devrd stop
+./devrd start
 ```
 
 ### No Flows Available
 
 ```bash
 # Ensure project is built
-./setup prompt
+./devrd prompt
 cd /workspace
 cmake -B build -S . -GNinja && ninja -C build install/strip
 
 # Outside container list the flows
-./setup nodered-flows
+./devrd flows
 ```
 
 ### Port Conflicts
@@ -273,16 +297,16 @@ If you see port binding errors:
 sudo lsof -ti:1881 | xargs sudo kill -9
 
 # Restart tools profile or entire environment
-./setup start tools
+./devrd start sil
 # OR
-./setup start
+./devrd start
 ```
 
 ### SIL Script Not Found
 
 ```bash
 # Ensure you're in the container
-./setup prompt
+./devrd prompt
 
 # Check if scripts exist
 cd /workspace/build
@@ -301,11 +325,11 @@ The Node-RED flows are generated during the build process. Always run `cmake` an
 
 ### 2. **Use Container Shell**
 
-Run SIL scripts from inside the container using `./setup prompt` to ensure proper environment setup.
+Run SIL scripts from inside the container using `./devrd prompt` to ensure proper environment setup.
 
 ### 3. **Monitor Services**
 
-Use `./setup nodered-status` to check if Node-RED is running and which flow is active.
+Use `./devrd flows` to see available flows.
 
 ### 4. **Service-Specific Commands**
 
@@ -313,9 +337,9 @@ Use profiles to manage service groups efficiently:
 
 ```bash
 # Start only what you need
-./setup start tools    # For SIL simulations
-./setup start ocpp     # For OCPP development
-./setup start mqtt     # For basic MQTT testing
+./devrd start sil    # For SIL simulations
+./devrd start ocpp   # For OCPP development
+./devrd start mqtt   # For basic MQTT testing
 ```
 
 ### 5. **Custom Project Names**
@@ -324,8 +348,8 @@ Use custom project names for multiple environments:
 
 ```bash
 # Different projects
-DOCKER_COMPOSE_PROJECT_NAME="project-a" ./setup start
-DOCKER_COMPOSE_PROJECT_NAME="project-b" ./setup start
+DOCKER_COMPOSE_PROJECT_NAME="project-a" ./devrd start
+DOCKER_COMPOSE_PROJECT_NAME="project-b" ./devrd start
 ```
 
 ### 6. **Check Logs**
@@ -342,9 +366,9 @@ docker logs devcontainer-devcontainer-1
 If you encounter issues, a clean restart often helps:
 
 ```bash
-./setup stop
-./setup purge
-./setup start
+./devrd stop
+./devrd purge
+./devrd start
 ```
 
 ### 8. **Custom Project Names**
@@ -353,8 +377,8 @@ When working with multiple projects, use custom project names to avoid conflicts
 
 ```bash
 # Different project names for different workspaces
-DOCKER_COMPOSE_PROJECT_NAME="project-a" ./setup start
-DOCKER_COMPOSE_PROJECT_NAME="project-b" ./setup start
+DOCKER_COMPOSE_PROJECT_NAME="project-a" ./devrd start
+DOCKER_COMPOSE_PROJECT_NAME="project-b" ./devrd start
 ```
 
 ## 🔗 Related Documentation
@@ -367,11 +391,11 @@ DOCKER_COMPOSE_PROJECT_NAME="project-b" ./setup start
 
 If you encounter issues:
 
-1. **Check Status**: `./setup nodered-status`
+1. **Check Status**: `./devrd flows` (checks container status)
 2. **Verify Build**: Ensure `cmake` and `ninja` completed successfully
 3. **Check Logs**: Look at container logs for error messages
-4. **Restart Clean**: Use `./setup purge` and `./setup start`
-5. **Review Commands**: Run `./setup --help` for available commands
+4. **Restart Clean**: Use `./devrd purge` and `./devrd start`
+5. **Review Commands**: Run `./devrd --help` for available commands
 
 ---
 

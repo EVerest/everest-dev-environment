@@ -22,9 +22,8 @@
 
 | Command | Description |
 |---------|-------------|
-| `./devrd nodered-flows` | List available simulation flows |
-| `./devrd nodered-flow <name>` | Switch to specific simulation flow |
-| `./devrd nodered-status` | Show Node-RED status and current flow |
+| `./devrd flows` | List all available flow files in workspace |
+| `./devrd flow <path>` | Switch to specific flow file using full path |
 
 ## Environment Configuration
 
@@ -81,65 +80,79 @@ The Docker Compose project name determines how containers are named and grouped.
 
 ## Available Flows
 
-*After building with `cmake` and `ninja`:*
+*Use `./devrd nodered-flows` to see all available flow files:*
 
-| Flow Name | Description |
+| Flow File | Description |
 |-----------|-------------|
-| `config-sil-dc` | Single DC charging simulation |
-| `config-sil-dc-bpt` | DC charging with BPT |
-| `config-sil-energy-management` | Energy management simulation |
-| `config-sil-two-evse` | Two EVSE simulation |
-| `config-sil` | Basic SIL simulation |
+| `everest-core/config/nodered/config-sil-dc-flow.json` | Single DC charging simulation |
+| `everest-core/config/nodered/config-sil-dc-bpt-flow.json` | DC charging with BPT |
+| `everest-core/config/nodered/config-sil-energy-management-flow.json` | Energy management simulation |
+| `everest-core/config/nodered/config-sil-two-evse-flow.json` | Two EVSE simulation |
+| `everest-core/config/nodered/config-sil-flow.json` | Basic SIL simulation |
+
+**Usage Examples:**
+```bash
+# List all available flows
+./devrd flows
+
+# Switch to DC charging flow
+./devrd flow everest-core/config/nodered/config-sil-dc-flow.json
+
+# Switch to energy management flow
+./devrd flow everest-core/config/nodered/config-sil-energy-management-flow.json
+```
 
 ## 🔍 Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Node-RED not starting | `./setup nodered-status` then `./setup stop && ./setup start` |
-| No flows available | `./setup prompt` then `cd /workspace && cmake -B build -S . -GNinja && ninja -C build install/strip` |
-| Port conflicts | `sudo lsof -ti:1881 \| xargs sudo kill -9` then `./setup start` |
+| Node-RED not starting | `./devrd flows` (checks container status) then `./devrd stop && ./devrd start` |
+| No flows available | `./devrd prompt` then `cd /workspace && cmake -B build -S . -GNinja && ninja -C build install/strip` |
+| Port conflicts | `sudo lsof -ti:1881 \| xargs sudo kill -9` then `./devrd start` |
 | SIL script not found | Ensure you're in container, project is built, and you're in `/workspace/build` |
 
 ## 📖 Help
 
 ```bash
-./setup --help              # Show all available commands
-./setup nodered-status      # Check Node-RED status
-./setup nodered-flows       # List available flows
+./devrd --help              # Show all available commands
+./devrd flows               # List available flows
 ```
 
 ## Examples
 
 ```bash
 # Start all services
-./setup start
+./devrd start
 
 # Start tools profile (Node-RED + MQTT Explorer)
-./setup start tools
+./devrd start sil
 
 # Start OCPP profile (Steve + OCPP DB + MQTT)
-./setup start ocpp
+./devrd start ocpp
 
 # Start only MQTT server
-./setup start mqtt
+./devrd start mqtt
 
 # Stop all services
-./setup stop
+./devrd stop
 
 # Stop tools profile
-./setup stop tools
+./devrd stop sil
 
 # Use custom project name
-DOCKER_COMPOSE_PROJECT_NAME="my-everest" ./setup start
+DOCKER_COMPOSE_PROJECT_NAME="my-everest" ./devrd start
 
-# Switch Node-RED flow
-./setup nodered-flow config-sil-dc
+# List available flows
+./devrd flows
+
+# Switch Node-RED flow using file path
+./devrd flow everest-core/config/nodered/config-sil-dc-flow.json
 
 # Purge all resources for current folder
-./setup purge
+./devrd purge
 
 # Purge all resources matching specific pattern
-./setup purge my-project
+./devrd purge my-project
 ```
 
 ---
