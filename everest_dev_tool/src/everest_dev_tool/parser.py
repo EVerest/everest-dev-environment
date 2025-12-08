@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 
-from . import services, git_handlers
+from . import git_handlers
 
 log = logging.getLogger("EVerest's Development Tool")
 
@@ -14,29 +14,6 @@ def get_parser(version: str) -> argparse.ArgumentParser:
     parser.set_defaults(action_handler=lambda _: parser.print_help())
 
     subparsers = parser.add_subparsers(help="available commands")
-
-    # Service related commands
-    services_parser = subparsers.add_parser("services", help="Service related commands", add_help=True)
-    services_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    services_subparsers = services_parser.add_subparsers(help="Service related commands")
-
-    start_service_parser = services_subparsers.add_parser("start", help="Start a service", add_help=True)
-    start_service_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    start_service_parser.add_argument("service_name", help="Name of Service to start")
-    start_service_parser.set_defaults(action_handler=services.start_service_handler)
-
-    stop_service_parser = services_subparsers.add_parser("stop", help="Stop a service", add_help=True)
-    stop_service_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    stop_service_parser.add_argument("service_name", help="Name of Service to stop")
-    stop_service_parser.set_defaults(action_handler=services.stop_service_handler)
-
-    services_info_parser = services_subparsers.add_parser("info", help="Show information about the current environment", add_help=True)
-    services_info_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    services_info_parser.set_defaults(action_handler=services.info_handler)
-
-    list_services_parser = services_subparsers.add_parser("list", help="List all available services", add_help=True)
-    list_services_parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
-    list_services_parser.set_defaults(action_handler=services.list_services_handler)
 
     # Git related commands
     clone_parser = subparsers.add_parser("clone", help="Clone a repository", add_help=True)
